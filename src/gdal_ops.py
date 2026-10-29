@@ -115,18 +115,23 @@ def g1():
 
 
 def g2():
-    """칩 모자이크 VRT: hr_src.vrt(PS-RGB), ms_src.vrt(MS, 동서 화소 크기 메타데이터 정정)."""
+    """칩 모자이크 VRT: hr_src.vrt(PS-RGB), ms_src.vrt(MS, 동서 화소 크기·원점 메타데이터 정정)."""
     W.mkdir(parents=True, exist_ok=True)
-    # MS 칩 geotransform은 163 px를 칩 범위에 맞춘 동서 화소 크기를 적었지만, 자료 간격은 4×PS다
-    # (ECC 아핀 추정 1.080065e-5° vs 4×PS 1.08e-5°, +0.006%; docs/decisions.md). 원점과 남북은 그대로 두고
-    # 칩마다 동서 화소 크기만 4×PS로 바꾼 VRT를 만든다(-a_ullr).
+    # MS 칩 geotransform은 163 px를 칩 범위에 맞춘 동서 화소 크기를 적었지만 자료 간격은 4×PS다(ECC 아핀 추정
+    # 1.080065e-5° vs 1.08e-5°, +0.006%). 원래 MS 격자 원점을 전역 칩 격자 서쪽 끝으로 보면 칩 열 k의 원점은
+    # 650k PS px = 162.5k MS px라 홀수 열 칩의 MS 원점은 칩 원점보다 2 PS px 서쪽이다(docs/decisions.md).
+    # 동서만 정정하고 남북은 그대로 둔다(-a_ullr VRT, 픽셀값 불변).
+    idx = pd.read_csv(D / 'chip_index.csv')
+    step = idx.maxx.iloc[0] - idx.minx.iloc[0]
+    col = dict(zip(idx.chip_id, np.rint((idx.minx - idx.minx.min()) / step).astype(int)))
     fix = W / 'ms_fix'
     fix.mkdir(exist_ok=True)
     for c in window_ids():
         ps, ms = gdal.Open(str(chip_path('PS-RGB', c))), gdal.Open(str(chip_path('MS', c)))
         gp, gm = ps.GetGeoTransform(), ms.GetGeoTransform()
         assert (gp[0], gp[3]) == (gm[0], gm[3]) and gp[2] == gp[4] == gm[2] == gm[4] == 0, (c, gp, gm)
-        ullr = (gm[0], gm[3], gm[0] + 4 * gp[1] * ms.RasterXSize, gm[3] + gm[5] * ms.RasterYSize)
+        x0 = gm[0] - 2 * gp[1] * (col[c] % 2)
+        ullr = (x0, gm[3], x0 + 4 * gp[1] * ms.RasterXSize, gm[3] + gm[5] * ms.RasterYSize)
         gdal.Translate(str(fix / f'{c}.vrt'), ms, format='VRT', outputBounds=ullr)
     for kind, name, files in (('PS-RGB', 'hr_src.vrt', [chip_path('PS-RGB', c) for c in window_ids()]),
                               ('MS', 'ms_src.vrt', [fix / f'{c}.vrt' for c in window_ids()])):
@@ -293,7 +298,11 @@ def g5():
     print(df[['n_windows', 'dx', 'dy', 'shift', 'window_shift_max', 'response_median', 'ecc_dx', 'ecc_dy', 'ecc_shift']]
           .describe().round(4).to_string())
     bad = df[df['shift'] > CFG['g5_max_shift']]
-    assert bad.empty, f"G5: {len(bad)} blocks exceed {CFG['g5_max_shift']} LR px:\n{bad.to_string()}"
+    # train 블록 초과는 경고로 남기고(제외하지 않음), val·test 블록 초과는 멈춘다(사용자 결정, docs/decisions.md).
+    print(f"G5 WARNING: {(bad.split == 'train').sum()} train blocks exceed {CFG['g5_max_shift']} LR px (kept):\n"
+          f"{bad[bad.split == 'train'].to_string()}")
+    stop = bad[bad.split != 'train']
+    assert stop.empty, f"G5: {len(stop)} val/test blocks exceed {CFG['g5_max_shift']} LR px:\n{stop.to_string()}"
 
 
 def block_read(path, geom, fp):
