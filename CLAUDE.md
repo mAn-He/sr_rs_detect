@@ -165,7 +165,9 @@ G1 점검: PS-RGB와 MS 각각 샘플 칩 5장에 `gdalinfo -stats`. CRS, 픽셀
     밴드 설명(있으면)을 data_report.md에 기록한다. MS 픽셀 크기가 PS-RGB의 약 4배가 아니면 멈추고 보고한다.
     칩은 EPSG:4326에서 각도 기준 정사각형이라 동서·남북 화소 크기(m)가 다르므로 4배 검증은 축별로 같은 단위끼리 비교한다.
 G2 모자이크: `gdalbuildvrt`로 PS-RGB 칩은 hr_src.vrt, MS 칩은 ms_src.vrt로 묶는다.
+    MS 화소 크기 메타데이터 정정(근거: decisions.md 'MS 동서 화소 크기 메타데이터 정정'): 칩마다 동서 화소 크기를 4×PS로 바꾼 VRT(-a_ullr, 원점·남북 유지)를 묶는다.
 G3 기준 격자: 지리좌표계(도 단위)면 `gdalwarp -of VRT -t_srs EPSG:32611`로 UTM 11N에 맞춘다.
+    LR은 G2에서 화소 크기 메타데이터를 정정한 ms_src.vrt에서 만든다.
     - HR: `-tr 0.3 0.3 -r cubic` → hr_utm.vrt
     - LR: MS에서 R, G, B 밴드를 골라(`-b`로 지정, 밴드 번호는 G1에서 확인한 근거와 함께 기록) `-tr 1.2 1.2 -r cubic` → lr_utm.vrt
     - 두 격자의 출력 범위(-te)를 같은 1.2m 정수배로 맞춰 LR 1픽셀이 HR 4×4픽셀에 정확히 대응하게 한다.
@@ -175,6 +177,7 @@ G4 공간 분할: 576m×576m 블록(= LR 480px = HR 1920px) 단위로 train/val/
 G5 정합 검사: 블록마다 HR을 1.2m로 평균 축소한 영상과 LR의 밝기 채널로 OpenCV `phaseCorrelate`를 계산해
     블록별 어긋남(LR 픽셀 단위)을 data_report.md에 기록한다. 0.5 LR 픽셀을 넘는 블록이 있으면 멈추고 보고한다. 보정은 하지 않는다.
     유효 픽셀만 쓴다(M8): 블록 안 각 train 칩 footprint를 안쪽으로 줄인 축 정렬 창마다 계산하고 블록 값은 창들의 중앙값으로 한다.
+    phaseCorrelate 창은 짝수 최적 DFT 크기로 자른다(getOptimalDFTSize가 홀수면 +0.5 px 편향). ECC(MOTION_TRANSLATION)를 같은 창에서 교차 확인값으로 함께 기록한다.
 G6 8비트 변환: HR과 LR은 서로 다른 제품이므로 각각 train 블록에서 밴드별 2~98 백분위를 따로 계산해
     `gdal_translate -ot Byte`의 밴드별 scale 옵션으로 적용한다(옵션명은 공식 문서 확인, 결과는 VRT).
     같은 장면의 HR과 LR 색 비교 PNG를 남기고, 색 차이가 크면 보고한다.

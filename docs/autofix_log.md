@@ -62,3 +62,9 @@ Stage 0 항목은 2026-10-29에 소급 기록했다.
 - 원인: run.py가 conda 활성화 없이 환경의 python을 직접 실행해 `PROJ_DATA`가 설정되지 않았다. rasterio는 import 시 PROJ 경로를 스스로 지정한다.
 - 조치: run.py가 각 단계 subprocess에 `PROJ_DATA=<환경>/share/proj`를 넘긴다. 설정 후 osgeo 단독 import에서도 EPSG 조회 성공.
 - 영향: 지금까지의 G1~G5는 CLI 또는 rasterio를 먼저 import한 프로세스에서 실행돼 결과에 영향이 없다(로그에 PROJ 오류 없음).
+
+### 10. G5 phaseCorrelate 홀수 DFT 크기 +0.5 px 편향
+- 증상: G5에서 110/168 블록이 0.5 LR px 초과, 동서 dx가 모든 블록에서 +0.4~0.6.
+- 원인: cv2.phaseCorrelate는 입력을 getOptimalDFTSize로 늘리는데 그 크기가 홀수인 축에서 정확히 +0.5 px 편향이 생긴다(동일 영상: 폭 128/144/150/160 → 0.000, 129/130/135 → 0.500). G5 창은 동서 크기가 대부분 홀수 DFT였다.
+- 조치: 창을 n 이하 짝수 최적 DFT 크기로 자르고(even_dft), 같은 창에서 ECC 평행이동을 함께 기록한다(ecc_dx, ecc_dy, ecc_shift). 합성 테스트에서 ECC 오차 ≤ 0.017 px.
+- 영향: 같은 데이터에서 0.5 초과 블록 110 → 9(ECC 7). 판정 임계값은 바꾸지 않았다.

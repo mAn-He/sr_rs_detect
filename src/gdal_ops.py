@@ -115,11 +115,23 @@ def g1():
 
 
 def g2():
-    """칩 모자이크 VRT: hr_src.vrt(PS-RGB), ms_src.vrt(MS)."""
+    """칩 모자이크 VRT: hr_src.vrt(PS-RGB), ms_src.vrt(MS, 동서 화소 크기 메타데이터 정정)."""
     W.mkdir(parents=True, exist_ok=True)
-    for kind, name in (('PS-RGB', 'hr_src.vrt'), ('MS', 'ms_src.vrt')):
+    # MS 칩 geotransform은 163 px를 칩 범위에 맞춘 동서 화소 크기를 적었지만, 자료 간격은 4×PS다
+    # (ECC 아핀 추정 1.080065e-5° vs 4×PS 1.08e-5°, +0.006%; docs/decisions.md). 원점과 남북은 그대로 두고
+    # 칩마다 동서 화소 크기만 4×PS로 바꾼 VRT를 만든다(-a_ullr).
+    fix = W / 'ms_fix'
+    fix.mkdir(exist_ok=True)
+    for c in window_ids():
+        ps, ms = gdal.Open(str(chip_path('PS-RGB', c))), gdal.Open(str(chip_path('MS', c)))
+        gp, gm = ps.GetGeoTransform(), ms.GetGeoTransform()
+        assert (gp[0], gp[3]) == (gm[0], gm[3]) and gp[2] == gp[4] == gm[2] == gm[4] == 0, (c, gp, gm)
+        ullr = (gm[0], gm[3], gm[0] + 4 * gp[1] * ms.RasterXSize, gm[3] + gm[5] * ms.RasterYSize)
+        gdal.Translate(str(fix / f'{c}.vrt'), ms, format='VRT', outputBounds=ullr)
+    for kind, name, files in (('PS-RGB', 'hr_src.vrt', [chip_path('PS-RGB', c) for c in window_ids()]),
+                              ('MS', 'ms_src.vrt', [fix / f'{c}.vrt' for c in window_ids()])):
         lst = W / f'{name}.txt'
-        lst.write_text('\n'.join(str(chip_path(kind, c)) for c in window_ids()) + '\n')
+        lst.write_text('\n'.join(map(str, files)) + '\n')
         run(['gdalbuildvrt', '-overwrite', '-input_file_list', lst, W / name])
 
 
@@ -220,6 +232,17 @@ def used_blocks():
     return b[b.use].reset_index(drop=True)
 
 
+def even_dft(n):
+    """phaseCorrelate는 getOptimalDFTSize로 늘린 크기가 홀수인 축에서 +0.5 px 편향이 생긴다. n 이하 짝수 최적 크기."""
+    while n % 2 or cv2.getOptimalDFTSize(n) != n:
+        n -= 1
+    return n
+
+
+def norm(x):
+    return ((x - x.mean()) / x.std()).astype(np.float32)
+
+
 def g5_block(args):
     geom, wins = args
     x0, _, _, y1 = geom.bounds
@@ -235,15 +258,18 @@ def g5_block(args):
         r0, r1 = math.ceil((y1 - wy1) / LR), math.floor((y1 - wy0) / LR)
         if min(c1 - c0, r1 - r0) < CFG['g5_min_window']:
             continue
-        han = cv2.createHanningWindow((c1 - c0, r1 - r0), cv2.CV_64F)
-        (dx, dy), resp = cv2.phaseCorrelate(np.ascontiguousarray(a[r0:r1, c0:c1]),
-                                            np.ascontiguousarray(b[r0:r1, c0:c1]), han)
-        res.append((dx, dy, resp))
+        w, h = even_dft(c1 - c0), even_dft(r1 - r0)
+        wa, wb = np.ascontiguousarray(a[r0:r0 + h, c0:c0 + w]), np.ascontiguousarray(b[r0:r0 + h, c0:c0 + w])
+        (dx, dy), resp = cv2.phaseCorrelate(wa, wb, cv2.createHanningWindow((w, h), cv2.CV_64F))
+        # 교차 확인: ECC 평행이동(template=HR 축소, input=LR). 부호는 phaseCorrelate와 같다(LR 내용의 +열·+행 이동).
+        _, m = cv2.findTransformECC(norm(wa), norm(wb), np.eye(2, 3, dtype=np.float32), cv2.MOTION_TRANSLATION,
+                                    (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 200, 1e-6), None, 5)
+        res.append((dx, dy, resp, float(m[0, 2]), float(m[1, 2])))
     return res
 
 
 def g5():
-    """블록별 HR(1.2 m 평균 축소)↔LR 밝기 phaseCorrelate. 칩 내부 창(유효 픽셀)만 사용."""
+    """블록별 HR(1.2 m 평균 축소)↔LR 밝기 phaseCorrelate(짝수 최적 DFT 크기 창) + ECC 교차 확인. 칩 내부 창만 사용."""
     blocks = used_blocks()
     chips = gpd.read_file(W / 'chips.geojson')
     jobs = []
@@ -257,12 +283,15 @@ def g5():
         assert res, f"G5: block {blk.block_id} has no valid window"
         r = np.array(res)
         dx, dy = np.median(r[:, 0]), np.median(r[:, 1])
+        ex, ey = np.median(r[:, 3]), np.median(r[:, 4])
         rows.append({'block_id': blk.block_id, 'split': blk.split, 'coverage': round(blk.coverage, 3), 'n_windows': len(r),
                      'dx': dx, 'dy': dy, 'shift': math.hypot(dx, dy),
-                     'window_shift_max': float(np.hypot(r[:, 0], r[:, 1]).max()), 'response_median': float(np.median(r[:, 2]))})
+                     'window_shift_max': float(np.hypot(r[:, 0], r[:, 1]).max()), 'response_median': float(np.median(r[:, 2])),
+                     'ecc_dx': ex, 'ecc_dy': ey, 'ecc_shift': math.hypot(ex, ey)})
     df = pd.DataFrame(rows)
     df.to_csv(W / 'g5_registration.csv', index=False)
-    print(df[['n_windows', 'dx', 'dy', 'shift', 'window_shift_max', 'response_median']].describe().round(4).to_string())
+    print(df[['n_windows', 'dx', 'dy', 'shift', 'window_shift_max', 'response_median', 'ecc_dx', 'ecc_dy', 'ecc_shift']]
+          .describe().round(4).to_string())
     bad = df[df['shift'] > CFG['g5_max_shift']]
     assert bad.empty, f"G5: {len(bad)} blocks exceed {CFG['g5_max_shift']} LR px:\n{bad.to_string()}"
 
