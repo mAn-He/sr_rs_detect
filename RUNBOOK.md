@@ -22,8 +22,21 @@ CONDA_PKGS_DIRS=/workspace/miniforge3/pkgs /workspace/miniforge3/bin/conda clean
 /workspace/miniforge3/envs/geo/bin/python run.py data
 ```
 
-## Stage 2 raster (G2~G6)
+## Stage 2 raster (G2~G7, G8은 Stage 5 sr_run에서)
 
 ```bash
 /workspace/miniforge3/envs/geo/bin/python run.py raster
+```
+
+## 스모크 Stage 1~6 (configs/default.yaml smoke: true, 2026-10-29 성공)
+
+```bash
+# 결과는 data/smoke, runs/smoke, results/. 각 단계 소요 시간·GPU·RAM은 logs/timing.csv
+P=/workspace/miniforge3/envs/geo/bin/python
+T=$(date +%Y%m%d_%H%M); nohup $P run.py data raster > logs/smoke_data_raster_$T.log 2>&1 &
+$P run.py tiles_labels > logs/smoke_tiles_labels_$(date +%Y%m%d_%H%M).log 2>&1
+$P run.py train_det > logs/smoke_train_det_$(date +%Y%m%d_%H%M).log 2>&1
+$P run.py sr > logs/smoke_sr_$(date +%Y%m%d_%H%M).log 2>&1
+$P run.py eval > logs/smoke_eval_$(date +%Y%m%d_%H%M).log 2>&1
+PROJ_DATA=/workspace/miniforge3/envs/geo/share/proj $P -m pytest -q tests
 ```

@@ -68,3 +68,25 @@ Stage 0 항목은 2026-10-29에 소급 기록했다.
 - 원인: cv2.phaseCorrelate는 입력을 getOptimalDFTSize로 늘리는데 그 크기가 홀수인 축에서 정확히 +0.5 px 편향이 생긴다(동일 영상: 폭 128/144/150/160 → 0.000, 129/130/135 → 0.500). G5 창은 동서 크기가 대부분 홀수 DFT였다.
 - 조치: 창을 n 이하 짝수 최적 DFT 크기로 자르고(even_dft), 같은 창에서 ECC 평행이동을 함께 기록한다(ecc_dx, ecc_dy, ecc_shift). 합성 테스트에서 ECC 오차 ≤ 0.017 px.
 - 영향: 같은 데이터에서 0.5 초과 블록 110 → 9(ECC 7). 판정 임계값은 바꾸지 않았다.
+
+## Stage 5 (스모크)
+
+### 11. S6 파인튜닝이 가중치를 바꾸지 않음
+- 증상: 스모크에서 S6 결과 지표가 S4와 소수점 끝자리까지 같았다. net_g_latest.pth의 params·params_ema가 RealESRGAN_x4plus.pth와 최대 차이 0.0.
+- 원인: 스모크 train 쌍이 4개인데 공식 batch_size_per_gpu는 12이고 BasicSR 학습 로더는 drop_last=True라, 에폭당 배치가 0개였다. 로그는 "iters: 20"을 찍지만 실제 갱신은 없었다.
+- 조치: smoke일 때만 공식 yml 옵션 dataset_enlarge_ratio를 ceil(12 / 쌍 수)로 올려 배치 1개 이상을 만든다. 전체 실행(쌍 수 ≥ 12)은 공식 값 1 그대로다. 학습 후 가중치가 바뀌었는지 assert한다.
+- 영향: 스모크 S6만 다시 실행. 학습 설정(배치, 손실, 학습률)은 바꾸지 않았다.
+
+## Stage 6 (스모크)
+
+### 12. det_infer.py: 타일 단위 val의 data YAML에 train 키 없음
+- 증상: `SyntaxError: .../tiles/hr/test.yaml 'train:' key missing`(Ultralytics check_det_dataset).
+- 원인: Ultralytics는 split과 무관하게 data YAML에 train·val 키를 요구한다.
+- 조치: test 평가용 YAML에 train·val도 images/test로 적는다(split='test'라 test만 읽는다).
+- 영향: 없음. 타일 단위 지표만 기록한다.
+
+### 13. det_infer.py: 첫 행(HR) 탐지 시간에 CUDA 초기화 포함
+- 증상: 스모크 det_timing에서 HR 15.9 s, 나머지 0.2~0.5 s.
+- 원인: 프로세스의 첫 predict 호출이 CUDA 초기화·모델 준비를 포함했다.
+- 조치: 행마다 타일 1장으로 예열한 뒤 시간을 잰다. 재실행 후 HR 0.26 s.
+- 영향: det_sec_per_km2만 바뀐다. 예측 결과는 같다.

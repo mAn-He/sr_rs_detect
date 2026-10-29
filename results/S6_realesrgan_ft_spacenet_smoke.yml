@@ -1,0 +1,105 @@
+name: S6_realesrgan_ft_spacenet_smoke
+model_type: RealESRGANModel
+scale: 4
+num_gpu: auto
+manual_seed: 0
+l1_gt_usm: true
+percep_gt_usm: true
+gan_gt_usm: false
+high_order_degradation: false
+datasets:
+  train:
+    name: DIV2K
+    type: RealESRGANPairedDataset
+    dataroot_gt: /root/tiles_cache/s6/gt
+    dataroot_lq: /root/tiles_cache/s6/lq
+    meta_info: /root/tiles_cache/s6/meta_info.txt
+    io_backend:
+      type: disk
+    gt_size: 256
+    use_hflip: true
+    use_rot: false
+    use_shuffle: true
+    num_worker_per_gpu: 5
+    batch_size_per_gpu: 12
+    dataset_enlarge_ratio: 3
+    prefetch_mode: null
+network_g:
+  type: RRDBNet
+  num_in_ch: 3
+  num_out_ch: 3
+  num_feat: 64
+  num_block: 23
+  num_grow_ch: 32
+network_d:
+  type: UNetDiscriminatorSN
+  num_in_ch: 3
+  num_feat: 64
+  skip_connection: true
+path:
+  pretrain_network_g: /workspace/weights/realesrgan/RealESRGAN_x4plus.pth
+  param_key_g: params_ema
+  strict_load_g: true
+  pretrain_network_d: /workspace/weights/realesrgan/RealESRGAN_x4plus_netD.pth
+  param_key_d: params
+  strict_load_d: true
+  resume_state: null
+train:
+  ema_decay: 0.999
+  optim_g:
+    type: Adam
+    lr: 0.0001
+    weight_decay: 0
+    betas:
+    - 0.9
+    - 0.99
+  optim_d:
+    type: Adam
+    lr: 0.0001
+    weight_decay: 0
+    betas:
+    - 0.9
+    - 0.99
+  scheduler:
+    type: MultiStepLR
+    milestones:
+    - 400000
+    gamma: 0.5
+  total_iter: 20
+  warmup_iter: -1
+  pixel_opt:
+    type: L1Loss
+    loss_weight: 1.0
+    reduction: mean
+  perceptual_opt:
+    type: PerceptualLoss
+    layer_weights:
+      conv1_2: 0.1
+      conv2_2: 0.1
+      conv3_4: 1
+      conv4_4: 1
+      conv5_4: 1
+    vgg_type: vgg19
+    use_input_norm: true
+    perceptual_weight: 1.0
+    style_weight: 0
+    range_norm: false
+    criterion: l1
+  gan_opt:
+    type: GANLoss
+    gan_type: vanilla
+    real_label_val: 1.0
+    fake_label_val: 0.0
+    loss_weight: 0.1
+  net_d_iters: 1
+  net_d_init_iters: 0
+logger:
+  print_freq: 5
+  save_checkpoint_freq: 5000.0
+  use_tb_logger: true
+  wandb:
+    project: null
+    resume_id: null
+dist_params:
+  backend: nccl
+  port: 29500

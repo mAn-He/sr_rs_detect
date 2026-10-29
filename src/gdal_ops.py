@@ -3,6 +3,7 @@ import json
 import math
 import subprocess
 import sys
+import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
@@ -15,6 +16,7 @@ import yaml
 from osgeo import gdal, osr
 from pyproj import Transformer
 from rasterio.features import rasterize
+from rasterio.transform import Affine
 from rasterio.windows import Window
 from shapely.geometry import box
 from shapely.ops import unary_union
@@ -362,7 +364,82 @@ def g6():
         print('PNG', png)
 
 
+def fills():
+    rad = json.loads((W / 'radiometry.json').read_text())
+    return rad['hr']['fill'], rad['lr']['fill']
+
+
+def write_tif(path, img, transform):
+    """8비트 3밴드 GeoTIFF(DEFLATE, TILED)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with rasterio.open(path, 'w', driver='GTiff', width=img.shape[2], height=img.shape[1], count=3, dtype='uint8',
+                       crs=UTM, transform=transform, compress='deflate', tiled=True, blockxsize=256, blockysize=256) as dst:
+        dst.write(img)
+
+
+def tile_mask(transform, shape, fp):
+    return rasterize([fp], out_shape=shape, transform=transform, dtype=np.uint8).astype(bool)
+
+
+def log_sr_time(method, seconds, km2):
+    """SR 처리 시간(처리한 면적 기준)을 W/sr_timing.csv에 방법별 한 행으로 남긴다."""
+    f = W / 'sr_timing.csv'
+    df = pd.read_csv(f) if f.exists() else pd.DataFrame(columns=['method', 'seconds', 'km2'])
+    row = pd.DataFrame([{'method': method, 'seconds': round(seconds, 2), 'km2': km2}])
+    pd.concat([df[df.method != method], row]).to_csv(f, index=False)
+
+
+def g7():
+    """보간 SR(test 블록만): lr_8bit.vrt → 0.3 m cubic(S0)·lanczos(S1) 블록 GeoTIFF. 무효 영역은 HR 채움값(M3)."""
+    blocks = used_blocks()
+    test = blocks[blocks.split == 'test']
+    fp = gpd.read_file(W / 'footprint.geojson').geometry.iloc[0]
+    hr_fill, _ = fills()
+    for method, alg in (('S0_gdal_cubic', 'cubic'), ('S1_gdal_lanczos', 'lanczos')):
+        t0 = time.time()
+        for blk in test.itertuples():
+            out = W / 'sr_blocks' / method / f'block_{blk.block_id:03d}.tif'
+            out.parent.mkdir(parents=True, exist_ok=True)
+            run(['gdalwarp', '-overwrite', '-te', *blk.geometry.bounds, '-tr', HR, HR, '-r', alg, '-multi',
+                 '-wo', f"NUM_THREADS={CFG['gdal_threads']}", '-co', 'COMPRESS=DEFLATE', '-co', 'TILED=YES',
+                 W / 'lr_8bit.vrt', out])
+            with rasterio.open(out, 'r+') as dst:
+                assert np.allclose(dst.res, (HR, HR)) and dst.shape == (round(B / HR),) * 2, (dst.res, dst.shape)
+                dst.write(filled(dst.read(), tile_mask(dst.transform, dst.shape, fp), hr_fill))
+        log_sr_time(method, time.time() - t0, len(test) * B**2 / 1e6)
+    # HR / LR(최근접 4배) / S0 비교 PNG 3장: test 블록 안쪽·유효 영역 안쪽 60 m의 건물 중심 3곳(시드 고정), 120 m(400 HR px).
+    bld = gpd.read_file(W / 'buildings_utm.geojson')
+    cen = bld.geometry.centroid
+    inner = unary_union([g.buffer(-60) for g in test.geometry]).intersection(fp.buffer(-60))
+    pick = cen[cen.within(inner)].sample(3, random_state=CFG['seed'])
+    for k, c in enumerate(pick):
+        x0, y1 = LR * math.floor(c.x / LR) - 60, LR * math.floor(c.y / LR) + 60
+        geom = box(x0, y1 - 120, x0 + 120, y1)
+        hr, _ = block_read(W / 'hr_8bit.vrt', geom, fp)
+        lo, _ = block_read(W / 'lr_8bit.vrt', geom, fp)
+        blk = test[test.contains(c)].iloc[0]
+        with rasterio.open(W / 'sr_blocks/S0_gdal_cubic' / f'block_{blk.block_id:03d}.tif') as src:
+            s0 = src.read(window=window(src, geom))
+        lr4 = np.repeat(np.repeat(lo, 4, axis=1), 4, axis=2)
+        png = FIG / f'g7_hr_lr_s0_{k}_block{blk.block_id}.png'
+        cv2.imwrite(str(png), cv2.cvtColor(np.hstack([x.transpose(1, 2, 0) for x in (hr, lr4, s0)]), cv2.COLOR_RGB2BGR))
+        print('PNG', png)
+
+
+def save_sr(img, lr_tile, hr_tile, out, fill, fp):
+    """G8: 딥러닝 SR 결과(RGB, HxWx3) 저장. transform = LR 타일 transform × Affine.scale(1/4), 무효 영역은 채움값(M3).
+    저장 후 같은 지리 창의 HR 타일과 transform·shape가 같은지 assert."""
+    with rasterio.open(lr_tile) as lr:
+        t = lr.transform * Affine.scale(1 / 4)
+        assert img.shape == (lr.height * 4, lr.width * 4, 3), (img.shape, lr.shape)
+    arr = img.transpose(2, 0, 1)
+    write_tif(out, filled(arr, tile_mask(t, arr.shape[1:], fp), fill), t)
+    with rasterio.open(out) as a, rasterio.open(hr_tile) as h:
+        assert a.transform.almost_equals(h.transform, 1e-9) and a.shape == h.shape and a.crs == h.crs, \
+            ('G8 grid mismatch', out, a.transform, h.transform, a.shape, h.shape)
+
+
 if __name__ == '__main__':
-    steps = {'g1': g1, 'g2': g2, 'g3': g3, 'g4': g4, 'g5': g5, 'g6': g6}
+    steps = {'g1': g1, 'g2': g2, 'g3': g3, 'g4': g4, 'g5': g5, 'g6': g6, 'g7': g7}
     for s in sys.argv[1:]:
         steps[s]()

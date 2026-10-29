@@ -5,7 +5,7 @@ weights_dir: /workspace/weights
 tmp_sr: /root/tmp_sr
 tiles_cache: /root/tiles_cache
 
-smoke: false
+smoke: true
 smoke_chips: 20
 seed: 0
 
@@ -13,21 +13,12 @@ enable_resshift: true
 enable_osediff: true
 enable_adcsr: false
 
-# 단계 → 환경 매핑 (docs/env_matrix.md)
+# 단계 → 환경 매핑 (docs/env_matrix.md). 모든 단계 스크립트는 gdal 환경에서 돌고,
+# 공식 SR 스크립트(SwinIR·Real-ESRGAN·ResShift, S6 학습)는 official_sr, OSEDiff는 official_osediff 환경의 python으로 실행한다.
 envs:
   gdal: geo
-  tiles: geo
-  labels: geo
-  sr_interp: geo
-  sr_deep: sr
-  sr_finetune: sr
-  sr_osediff: osediff
-  det_train: geo
-  det_infer: geo
-  merge: geo
-  eval: geo
-  sr_metrics: geo
-  report: geo
+  official_sr: sr
+  official_osediff: osediff
 
 # CPU 병렬 (Stage 0 측정: cgroup 13.6코어, RAM 62GB)
 gdal_threads: 12
@@ -55,3 +46,53 @@ g5_max_shift: 0.5
 
 # G6: 8비트 변환 백분위
 pct: [2, 98]
+
+# G9 타일 (LR px): 창 256, 블록 안 시작점 0과 224(겹침 32). train·val 타일은 유효 비율 이상만(M7)
+tile_lr: 256
+tile_starts_lr: [0, 224]
+min_valid_frac: 0.25
+
+# G10 라벨: 타일 창으로 자른 면적이 원래 면적의 이 비율 미만이면 제외
+label_min_frac: 0.5
+
+# 탐지기 (Ultralytics 공식 OBB, 작성 시점 YOLO26-OBB s)
+yolo_weights: yolo26s-obb.pt
+imgsz_hr: 1024
+imgsz_lr: 256
+epochs: 100          # Ultralytics 공식 기본값. smoke는 smoke_epochs
+smoke_epochs: 1
+patience: 20
+batch: 0.80          # 공식 AutoBatch: GPU 메모리 80%
+workers: 8
+# 추론: AP용 예측은 Ultralytics val 기본 conf 0.001, 거짓 양성·재현율 운영점은 predict 기본 conf 0.25,
+# 타일 병합 NMS IoU는 Ultralytics 기본 0.7
+det_conf_ap: 0.001
+det_conf_op: 0.25
+nms_iou: 0.7
+
+# S6 Real-ESRGAN paired 파인튜닝 반복 횟수(공식 400k에서 출발, 스모크 측정 후 3시간 이내로 줄여 확정)
+s6_total_iter: 400000
+s6_smoke_iter: 20
+
+# 평가 (M4, M5, G12)
+eval_buffer_lr: 8
+eval_buffer_sens: [0, 8, 16]
+eval_outside_frac: 0.5
+match_iou: 0.5
+area_bins: [50, 150, 400]
+bootstrap: 1000
+smoke_bootstrap: 50
+
+# OpenCV 엣지 지표: Canny 임계값 = HR train 타일 밝기 중앙값 × 비율(한 번 정해 모든 방법에 같은 값)
+canny_ratio: [0.66, 1.33]
+
+# SR 방법 ID → 범주 (CLAUDE.md 'SR 방법'). S5는 enable_resshift, S7은 enable_osediff일 때만 실행한다.
+sr_methods:
+  S0_gdal_cubic: interpolation
+  S1_gdal_lanczos: interpolation
+  S2_swinir_classical_x4: regression
+  S3_realesrnet_x4plus: regression
+  S4_realesrgan_x4plus: gan
+  S5_resshift_v3_x4: diffusion_efficient
+  S6_realesrgan_ft_spacenet: domain_finetune
+  S7_osediff_x4: diffusion_1step
