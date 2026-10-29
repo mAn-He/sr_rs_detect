@@ -50,3 +50,15 @@ Stage 0 항목은 2026-10-29에 소급 기록했다.
 - 원인: `xargs -P`로 병렬 실행한 `printf`와 `gdalinfo -json` 출력이 한 stdout에서 줄 단위로 섞였다.
 - 조치: GDAL Python 바인딩(`gdal.Open('/vsis3/...').GetGeoTransform()`)을 ThreadPoolExecutor(n_proc=12)로 호출하고 한 프로세스에서 CSV를 쓴다. `GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR`로 칩당 헤더 읽기 약 9 s → 1 s.
 - 영향: 3,850장 위치 목록 4분 16초, 파일은 받지 않았다.
+
+### 8. download_data.sh: aws CLI 파일별 호출이 느림
+- 증상: 파일별 `aws s3 cp`(12개 병렬)가 3분에 71장(합계 약 1 MB/s). 같은 파일을 curl로 받으면 1.1 s, aws CLI는 8.7~14.6 s.
+- 원인: aws CLI(Python)가 FUSE 볼륨(/workspace/miniforge3)에서 수천 개 모듈을 import하는 시작 시간. IMDS 비활성화로는 일부만 줄었다.
+- 조치: aws 한 프로세스에 `--recursive --exclude '*' --include '*_img<ID>.<ext>' ...` 목록을 넘겨 CLI 자체 동시 전송을 쓴다. 중단 시 남은 임시 파일 3개(`*.tif.<난수>`, 미완성)는 삭제했고 완성 파일은 크기(2,537,990 B)로 확인했다.
+- 영향: 받는 파일 목록과 내용은 같다. 마지막에 폴더별 파일 수 = 창 칩 수를 assert.
+
+### 9. osgeo 단독 import 시 EPSG 조회 실패 (PROJ 데이터 경로)
+- 증상: `from osgeo import osr; SpatialReference().ImportFromEPSG(32611)`이 6(실패)을 반환하고 `PROJ: proj_create_from_database: Open of .../envs/geo/share/proj failed`. `rasterio`를 먼저 import하면 성공하고, CLI(gdalwarp, projinfo)는 정상.
+- 원인: run.py가 conda 활성화 없이 환경의 python을 직접 실행해 `PROJ_DATA`가 설정되지 않았다. rasterio는 import 시 PROJ 경로를 스스로 지정한다.
+- 조치: run.py가 각 단계 subprocess에 `PROJ_DATA=<환경>/share/proj`를 넘긴다. 설정 후 osgeo 단독 import에서도 EPSG 조회 성공.
+- 영향: 지금까지의 G1~G5는 CLI 또는 rasterio를 먼저 import한 프로세스에서 실행돼 결과에 영향이 없다(로그에 PROJ 오류 없음).

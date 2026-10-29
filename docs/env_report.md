@@ -81,3 +81,6 @@
 | VERSIONS.md SD2.1 기록 | 기록됨: Manojb/stable-diffusion-2-1-base, 커밋 0094d483a120f3f33dafbd187ea4aa60d10de75c, safetensors 3개 SHA256 | third_party/VERSIONS.md |
 | autofix_log.md | 점검 시점에는 파일 없음 → 이후 docs/autofix_log.md를 만들어 Stage 0 수정 5건을 소급 기록. 점검 당시 osediff.yml에 공식 requirements.txt에 없는 고정 2개(torchvision==0.15.2, numpy==1.26.4)가 있고, yml 주석이 가리키는 env_report.md에는 그 근거 기록이 없었다. 방법 제외 기록은 없다(S8 AdcSR은 config 기본값 false). | env/osediff.yml, third_party/OSEDiff/requirements.txt |
 | 정리 후 du -sh /workspace | 92G / 상한 160G | logs/stage0_clean_20261029_1316.log, logs/stage0_clean_base_20261029_1325.log |
+
+## Stage 1 사용량 (2026-10-29 15:40)
+- `du -sh /workspace`: 97G (상한 160G). data/raw: PS-RGB 2.8G, MS 477M, geojson_buildings 31M. run.py의 `du -sb` 기준 103.4 GB(10^9 B, 상한 판정 150 GB).

@@ -14,3 +14,10 @@ T=$(date +%Y%m%d_%H%M); nohup bash scripts/setup_envs.sh > logs/stage0_setup_$T.
 CONDA_PKGS_DIRS=/workspace/cache/conda /workspace/miniforge3/bin/conda clean -a -y --force-pkgs-dirs
 CONDA_PKGS_DIRS=/workspace/miniforge3/pkgs /workspace/miniforge3/bin/conda clean -a -y --force-pkgs-dirs
 ```
+
+## Stage 1 data
+
+```bash
+# 칩 위치 목록(헤더만), 창 선택, 창 안 PS-RGB·MS·GeoJSON 다운로드, G1
+/workspace/miniforge3/envs/geo/bin/python run.py data
+```
