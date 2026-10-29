@@ -52,12 +52,13 @@ def ps_path(c):
     return str(RAW / f'PS-RGB/SN2_buildings_train_AOI_2_Vegas_PS-RGB_img{c}.tif')
 
 
-def native(c, px_x=None, px_y=None, shift_ps_px=0.0):
-    """PS를 MS 격자로 average 축소한 밝기와 MS 밝기. px_x/px_y/shift로 MS geotransform 가설을 바꿔 본다."""
+def native(c, px_x=None, px_y=None, shift_x_ps=0.0, shift_y_ps=0.0):
+    """PS를 MS 격자로 average 축소한 밝기와 MS 밝기. MS geotransform 가설: 화소 크기 px_x/px_y(°),
+    원점을 서쪽으로 shift_x_ps, 북쪽으로 shift_y_ps PS 화소만큼 옮김."""
     m = gdal.Open(ms_path(c))
     g = list(m.GetGeoTransform())
-    g[0] -= shift_ps_px * 2.7e-6
-    g[3] += shift_ps_px * 2.7e-6
+    g[0] -= shift_x_ps * 2.7e-6
+    g[3] += shift_y_ps * 2.7e-6
     if px_x is not None:
         g[1] = px_x
     if px_y is not None:
@@ -86,7 +87,7 @@ def chip_job(args):
     _, r['nat_bottom_dy'] = pc(a[h:], b[h:])
     # 가설: MS 화소 = 4 × PS(1.08e-5°), 원점 같음 / 원점을 1 PS px 앞으로(가운데 정렬)
     for name, sh in (('h4_origin', 0.0), ('h4_center', 1.0)):
-        a2, b2 = native(cid, 4 * 2.7e-6, 4 * 2.7e-6, sh)
+        a2, b2 = native(cid, 4 * 2.7e-6, 4 * 2.7e-6, sh, sh)
         a2, b2 = a2[k:-k, k:-k], b2[k:-k, k:-k]
         r[f'{name}_dx'], r[f'{name}_dy'] = pc(a2, b2)
     # UTM 파이프라인(G5와 같은 입력): 칩 안쪽 6 m 창, HR 4x4 평균 vs LR(cubic VRT)
