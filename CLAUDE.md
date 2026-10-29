@@ -71,8 +71,9 @@ E5. 설치와 재현성: Miniforge를 /workspace/miniforge3에 설치하고 GDAL
     scripts/setup_envs.sh는 여러 번 실행해도 안전해야 한다. 최종 구성과 이유를 env_report.md에 적는다.
 
 # 저장 공간 최소화 (반드시 지킬 것)
-- Vegas 중 서로 인접한 칩 1,200장 내외만 받는다. 먼저 칩 위치 목록만 내려받아 연속된 직사각형 영역을 고르고,
-  그 영역의 PS-RGB, MS, 건물 GeoJSON만 다운로드한다. 고른 범위를 docs/data_report.md에 기록한다.
+- Vegas train 칩 중 1,200장 내외만 받는다. 먼저 칩 위치 목록(헤더만)을 만들고, 칩 격자에서 train 칩 1,150~1,250장을 담는
+  가장 조밀한 직사각형 창을 고른 뒤 그 창의 train 칩 PS-RGB, MS, 건물 GeoJSON만 다운로드한다. 고른 범위를 docs/data_report.md에 기록한다.
+  (SpaceNet은 train/test 칩이 공간적으로 섞여 있어 train 칩은 격자의 약 54%만 차지한다. 인접 칩 1,200장 직사각형은 없다. 빈칸은 아래 '유효 마스크와 NoData 규칙'으로 처리한다.)
 - 다른 AOI, PAN, PS-MS, tarball은 받지 않는다.
 - 모자이크와 좌표계 변환은 VRT로만 만든다. 실제 래스터 파일은 최종 8비트 타일과 SR 결과만 쓴다.
 - 모든 GeoTIFF는 `COMPRESS=DEFLATE, TILED=YES`로 저장한다.
@@ -149,18 +150,31 @@ rs-sr-detect/
   docs/            # env_matrix.md, env_report.md, data_report.md, code_check.md, decisions.md
 - 구현 중 필요 없는 파일은 만들지 않는다. 더 필요하면 이유를 보고한다.
 
+# 유효 마스크와 NoData 규칙 (2026-10-29 확정, 변경 금지)
+M1 유효 마스크: 픽셀값이 아니라 train 칩 footprint 폴리곤(UTM) 합집합으로 만들고 HR·LR 격자 각각에 래스터화한다.
+M2 NoData 채움: 무효 픽셀은 0이 아니라 train 블록 유효 픽셀의 밴드별 평균(8비트 변환 후)으로 채운다. HR·LR·모든 경로에 같은 규칙을 쓴다.
+M3 SR 후처리: 모든 SR 출력(S0~S8)의 무효 영역을 같은 채움값으로 다시 덮어쓴다.
+M4 평가 영역: footprint 합집합을 안쪽으로 9.6m(LR 8px) buffer한 영역. 폴리곤 면적의 50% 이상이 평가 영역 밖인 GT와 예측은 TP/FP/FN 모두에서 제외한다.
+M5 민감도: 제외 폭 0/8/16 LR px로 AP50·gain·verdict를 다시 계산해 summary.csv와 README에 싣는다.
+M6 화질 지표: PSNR·SSIM·edge 지표는 평가 영역 마스크 안에서만 계산하고, LPIPS는 spatial=True 맵을 마스크로 평균한다.
+M7 타일 포함: train·val 타일은 유효 비율 25% 이상만 쓴다. test 타일은 기준 없이 전부 처리하고 평가는 마스크로 제한한다.
+M8 유효 픽셀만: G6 백분위 정규화, G5 phaseCorrelate, Canny 임계값은 유효 픽셀만으로 계산한다.
+
 # GDAL 처리 명세 (이 순서와 방식을 지킬 것)
 G1 점검: PS-RGB와 MS 각각 샘플 칩 5장에 `gdalinfo -stats`. CRS, 픽셀 크기, dtype, 비트 심도, NoData, 밴드 수,
     밴드 설명(있으면)을 data_report.md에 기록한다. MS 픽셀 크기가 PS-RGB의 약 4배가 아니면 멈추고 보고한다.
+    칩은 EPSG:4326에서 각도 기준 정사각형이라 동서·남북 화소 크기(m)가 다르므로 4배 검증은 축별로 같은 단위끼리 비교한다.
 G2 모자이크: `gdalbuildvrt`로 PS-RGB 칩은 hr_src.vrt, MS 칩은 ms_src.vrt로 묶는다.
 G3 기준 격자: 지리좌표계(도 단위)면 `gdalwarp -of VRT -t_srs EPSG:32611`로 UTM 11N에 맞춘다.
     - HR: `-tr 0.3 0.3 -r cubic` → hr_utm.vrt
     - LR: MS에서 R, G, B 밴드를 골라(`-b`로 지정, 밴드 번호는 G1에서 확인한 근거와 함께 기록) `-tr 1.2 1.2 -r cubic` → lr_utm.vrt
     - 두 격자의 출력 범위(-te)를 같은 1.2m 정수배로 맞춰 LR 1픽셀이 HR 4×4픽셀에 정확히 대응하게 한다.
 G4 공간 분할: 576m×576m 블록(= LR 480px = HR 1920px) 단위로 train/val/test = 70/15/15 배정(splits.geojson). 무작위 타일 분할 금지.
+    70/15/15는 건물 수 기준으로 맞추고 실제 블록 수·건물 수·면적 비율을 data_report.md에 기록한다. train 칩 footprint와 겹치지 않는 블록은 버린다.
     블록 격자는 공통 범위의 좌상단에서 시작하고, 가장자리에서 576m를 채우지 못하는 블록은 버리고 버린 면적(km²)을 data_report.md에 기록한다.
 G5 정합 검사: 블록마다 HR을 1.2m로 평균 축소한 영상과 LR의 밝기 채널로 OpenCV `phaseCorrelate`를 계산해
     블록별 어긋남(LR 픽셀 단위)을 data_report.md에 기록한다. 0.5 LR 픽셀을 넘는 블록이 있으면 멈추고 보고한다. 보정은 하지 않는다.
+    유효 픽셀만 쓴다(M8): 블록 안 각 train 칩 footprint를 안쪽으로 줄인 축 정렬 창마다 계산하고 블록 값은 창들의 중앙값으로 한다.
 G6 8비트 변환: HR과 LR은 서로 다른 제품이므로 각각 train 블록에서 밴드별 2~98 백분위를 따로 계산해
     `gdal_translate -ot Byte`의 밴드별 scale 옵션으로 적용한다(옵션명은 공식 문서 확인, 결과는 VRT).
     같은 장면의 HR과 LR 색 비교 PNG를 남기고, 색 차이가 크면 보고한다.
@@ -257,6 +271,7 @@ Stage 7 report: README.md에 목적과 대리 실험 정의, 데이터, GDAL·Op
 # 스모크 테스트
 - config의 `smoke: true`면 칩 20장(576m 블록이 3개 이상 나오게 고르고 train/val/test 각각 최소 1블록을 강제, 이 규칙은 smoke일 때만), 에폭 1, S6 반복 횟수 최소, 부트스트랩 50회로 Stage 1~6이 끝까지 돌아야 한다.
   활성화된 diffusion 모델(S5, S7)도 타일 몇 장으로 실제 추론을 거쳐야 한다.
+- 스모크 칩 구성: 576m 블록 3개 이상, 분할마다 1블록 이상, 칩 20장 내외(블록에 빈칸이 있어도 된다).
 - 스모크 테스트를 통과하면 결과, timing.csv의 병목 분석, 용량 사용량, G1·G5 확인 결과를 요약 보고하고 멈춘다.
   전체 실행은 내가 지시한 뒤 시작한다.
 
