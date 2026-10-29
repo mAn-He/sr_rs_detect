@@ -36,3 +36,17 @@ Stage 0 항목은 2026-10-29에 소급 기록했다.
   - torchvision: requirements.txt의 `basicsr`가 버전 없이 torchvision을 요구해, 고정이 없으면 pip가 최신 torchvision과 그에 맞는 새 torch를 설치해 공식 고정값 torch==2.0.1을 깰 수 있다. BasicSR 1.4.2는 torchvision<0.17도 필요하다(env_matrix.md).
 - 조치: torch 2.0.1의 공식 짝인 `torchvision==0.15.2`, NumPy 1.x 최신 `numpy==1.26.4`로 고정. 공식 requirements.txt의 고정값은 하나도 바꾸지 않았다.
 - 영향: 설치 결과 torch 2.0.1+cu117, torchvision 0.15.2, numpy 1.26.4(env/osediff.lock.txt). OSEDiff 최소 추론 통과.
+
+## Stage 1
+
+### 6. aws CLI 없음 (geo 환경)
+- 증상: `aws` 명령이 시스템과 geo 환경 어디에도 없다.
+- 원인: Stage 0 환경 설계에 S3 다운로드 도구가 빠져 있었다.
+- 조치: `conda install -n geo -c conda-forge awscli`(2.38.3), env/geo.yml에 `awscli` 추가, env/geo.lock.txt 갱신. 설치 중 python-dateutil 3.0.0→2.9.0, urllib3 2.8.0→2.6.3 다운그레이드(pandas·requests 하한 조건 안). 패키지 캐시는 `conda clean -a -y --force-pkgs-dirs`로 삭제.
+- 영향: verify_env_geo.py 재실행 통과(logs/stage1_verify_geo_20261029_1332.log).
+
+### 7. download_data.sh: 칩 헤더 병렬 수집 출력 섞임
+- 증상: `json.decoder.JSONDecodeError: Extra data`(logs/stage1_index_*.log 첫 실행).
+- 원인: `xargs -P`로 병렬 실행한 `printf`와 `gdalinfo -json` 출력이 한 stdout에서 줄 단위로 섞였다.
+- 조치: GDAL Python 바인딩(`gdal.Open('/vsis3/...').GetGeoTransform()`)을 ThreadPoolExecutor(n_proc=12)로 호출하고 한 프로세스에서 CSV를 쓴다. `GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR`로 칩당 헤더 읽기 약 9 s → 1 s.
+- 영향: 3,850장 위치 목록 4분 16초, 파일은 받지 않았다.

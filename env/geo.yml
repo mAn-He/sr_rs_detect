@@ -10,6 +10,7 @@ dependencies:
   - shapely
   - pyproj
   - pyyaml
+  - awscli
   - pip
   - pip:
       - torch==2.15.0
