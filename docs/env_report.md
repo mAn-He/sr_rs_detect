@@ -1,19 +1,34 @@
 # 환경 보고서
 
-## Stage 0 하드웨어 측정 (2026-10-29)
+## Stage 0 하드웨어 측정 (2026-10-29, 파드 jzyfcpm93plj55, EUR-IS-1)
 
-원본 출력: logs/stage0_hw.log
+원본 출력: logs/stage0_hw_20261029_0925.log. 이전 파드 측정(logs/stage0_hw.log, 54.4코어·overlay 디스크)은 이 파드에 해당하지 않는다.
 
-| 항목 | 측정값 | CLAUDE.md 가정 |
-|---|---|---|
-| OS | Ubuntu 24.04.5 LTS | Ubuntu |
-| GPU | RTX 4090 24564MiB × 1, 드라이버 595.91.07, 드라이버 CUDA 13.2 | RTX 4090 24GB × 1 |
-| CPU | `nproc` 256(호스트 전체 표시). cgroup 할당량 cfs_quota 5440000/period 100000 = 54.4 CPU, `RUNPOD_CPU_COUNT=64` | vCPU 8 |
-| RAM | `free -h` 251Gi(호스트 표시). cgroup memory.limit 61,999,996,928 B(≈62GB), `RUNPOD_MEM_GB=62` | 62GB |
-| 디스크 | `/workspace`는 별도 마운트가 없고 `/`와 같은 overlay 50G(사용 334M)다. `/root`도 같은 파일시스템 | 영구 네트워크 볼륨 `/workspace` |
-| /workspace 읽기 | 순차 1MiB O_DIRECT 3.3 GB/s, 4KiB O_DIRECT 130 MB/s(≈32k IOPS). 캐시를 거친 읽기는 11~12 GB/s | - |
-| 기존 사용량 | /workspace/.cache/pip 1.1G, /workspace/rs-sr-detect 232K | - |
+| 항목 | 측정값 |
+|---|---|
+| OS | Ubuntu 22.04.5 LTS |
+| GPU | RTX 4090 24564MiB × 1, compute 8.9, 드라이버 595.91.07, 드라이버 CUDA 13.2 |
+| CPU | `nproc` 64. cgroup cpu.max 1360000/100000 = 13.6 CPU, `RUNPOD_CPU_COUNT=16` |
+| RAM | `free -h` 251Gi(호스트 표시). cgroup memory.max 61,999,996,928 B(≈62GB), `RUNPOD_MEM_GB=62` |
+| /workspace | 네트워크 볼륨 `mfs#eur-is-1.runpod.net:9421[/networkvolumes/dyo07en3fi]`(FUSE). `df`는 클러스터 전체(2.1P)를 표시해 볼륨 할당량을 알 수 없다 |
+| /root | 컨테이너 overlay 50G(사용 411M), 파드 재시작 시 사라진다 |
+
+### 읽기 속도 (4GiB 파일, dd)
+
+| 경로 | 순차 1MiB O_DIRECT | 4KiB O_DIRECT | 작은 파일 2000×64KiB 쓰기 / 읽기 |
+|---|---|---|---|
+| /workspace | 650 MB/s | 78 MB/s | 11.24 s / 4.40 s |
+| /root | 3.4 GB/s | 152 MB/s | 0.18 s / 0.07 s |
 
 ### 측정값에 따른 판단
-- I/O: `/root/tiles_cache`는 `/workspace`와 같은 overlay 디스크라서 복사해도 읽기 속도가 바뀌지 않는다. 순차 3.3 GB/s면 학습 로더의 병목이 아니므로 복사는 생략한다.
-- 저장 공간 80% 상한 = 50G × 0.8 = 40G.
+- CPU: gdal_threads=12, 프로세스 병렬 상한 n_proc=12(13.6코어 중 시스템 몫). GPU 1장이라 단계가 순서대로 돌아 학습 로더 워커 8개와 겹치지 않는다. 프로세스당 RAM 약 5GB.
+- I/O: /root가 순차 약 5배, 작은 파일 약 60배 빠르다. 학습 직전 타일을 /root/tiles_cache로 복사한다.
+- 설치: conda 환경은 규칙대로 /workspace/miniforge3에 두지만 작은 파일이 많아 설치·import가 느릴 수 있다.
+
+### 시작 시점 /workspace 사용량 (du -sh)
+| 경로 | 크기 | 소유 |
+|---|---|---|
+| /workspace/Vla_check | 33G | 다른 프로젝트(건드리지 않음) |
+| /workspace/.cache (huggingface, pip, uv) | 29G | 다른 프로젝트로 보임(건드리지 않음) |
+| /workspace/.venvs/openvla | 16G | 다른 프로젝트(건드리지 않음) |
+| /workspace/rs-sr-detect | 9.0M | 이 프로젝트 |

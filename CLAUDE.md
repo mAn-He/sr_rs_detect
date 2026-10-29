@@ -4,7 +4,8 @@
 
 # 작업 환경
 - 너는 RunPod 파드 안에서 실행 중이다. 코드 작성, 환경 설치, 데이터 다운로드, 학습, 추론, 평가를 모두 여기서 직접 실행한다.
-  - OS: Ubuntu, NVIDIA RTX 4090(24GB) 1장, RAM 62GB(cgroup 한도), CPU 54.4코어(cgroup 할당량, RUNPOD_CPU_COUNT=64. `nproc`은 호스트 256을 표시하므로 쓰지 않는다), 영구 네트워크 볼륨 `/workspace`
+  - OS: Ubuntu 22.04, NVIDIA RTX 4090(24GB) 1장, RAM 62GB(cgroup 한도), CPU 13.6코어(cgroup 할당량, RUNPOD_CPU_COUNT=16. `nproc`은 64를 표시하므로 쓰지 않는다)
+  - 디스크: `/workspace`는 영구 네트워크 볼륨(MooseFS FUSE, 순차 읽기 약 650 MB/s, 작은 파일 접근이 느리다). `/root`는 파드 재시작 시 사라지는 컨테이너 디스크(overlay 50G, 순차 읽기 약 3.4 GB/s).
   - 저장소 위치: /workspace/rs-sr-detect
 - /workspace만 파드를 재시작해도 남는다. 가상환경, 데이터, 가중치, 결과, 로그는 모두 /workspace 아래에 둔다.
 - 경로는 하드코딩하지 않는다. configs/default.yaml의 `root: /workspace/rs-sr-detect` 하나에서 파생시킨다.
@@ -85,9 +86,9 @@ E5. 설치와 재현성: Miniforge를 /workspace/miniforge3에 설치하고 GDAL
 # 학습·처리 가속 (공식 옵션만 사용, 별도 분산 코드 작성 금지)
 - Stage 0에서 `nproc`, `free -h`, `nvidia-smi`, `df -h`와 /workspace 읽기 속도를 측정해 env_report.md에 기록하고, 이 값으로 아래 설정의 기본값을 정한다.
 - CPU 병렬:
-  - gdalwarp는 `-multi -wo NUM_THREADS=<config의 gdal_threads, 32>`를 쓴다. ALL_CPUS는 cgroup 할당량이 아닌 호스트 256코어를 인식할 수 있어 쓰지 않는다.
+  - gdalwarp는 `-multi -wo NUM_THREADS=<config의 gdal_threads, 12>`를 쓴다. ALL_CPUS는 cgroup 할당량이 아닌 64코어를 인식할 수 있어 쓰지 않는다.
   - 블록 단위 전처리(밴드 선택, 리샘플, 타일 저장)와 지리 평가 매칭, 부트스트랩, 엣지 지표 계산은 블록별로 프로세스 병렬 처리한다.
-  - GDAL·타일링·평가의 프로세스 병렬 개수는 32개를 넘기지 않는다(54코어 중 학습 로더 워커 8개와 시스템 몫을 남긴다. 프로세스당 RAM 약 1.9GB 이내).
+  - GDAL·타일링·평가의 프로세스 병렬 개수는 12개를 넘기지 않는다(13.6코어 중 시스템 몫을 남긴다. GPU 1장이라 단계가 순서대로 실행되므로 학습 로더 워커와 동시에 돌지 않는다. 프로세스당 RAM 약 5GB 이내).
   - 학습 데이터 로더 워커는 8개(Ultralytics 공식 기본값)로 한다.
   - 배치 크기: 24GB에서 메모리 부족이 나지 않는 최대값의 약 80%(config와 decisions.md에 값과 근거 기록).
   - YOLO 에폭 상한은 Ultralytics 공식 기본값, patience=20으로 조기 종료. 배치는 Ultralytics 공식 `batch=0.80`(GPU 메모리 80% AutoBatch)을 쓰고 실제 배치 값을 기록한다. D_HR, D_LR 각각 3시간을 넘을 것으로 예상되면 에폭을 줄이고 보고한다.
@@ -100,7 +101,7 @@ E5. 설치와 재현성: Miniforge를 /workspace/miniforge3에 설치하고 GDAL
     한 학습을 여러 GPU로 쪼개는 DDP는 쓰지 않는다.
   - Ultralytics AMP와 SR 추론 fp16은 공식 기본값을 유지한다.
 - I/O: 학습 직전에 해당 학습의 타일만 컨테이너 디스크(/root/tiles_cache)로 복사해 읽고, 학습이 끝나면 삭제한다.
-  /workspace 읽기 속도가 충분하면 복사를 생략하고 그 판단을 기록한다.
+  Stage 0 측정에서 /root가 /workspace보다 순차 읽기 약 5배, 작은 파일 접근 약 60배 빨라 복사를 기본으로 한다.
 - 스모크 테스트에서 GPU 사용률과 단계별 소요 시간을 logs/timing.csv에 기록하고, 병목(CPU, I/O, GPU)을 보고한다.
 
 # 먼저 읽을 공식 문서

@@ -57,7 +57,13 @@
 - 결과가 지지했는가:
 
 ## CPU 병렬 개수
-- 선택: GDAL·타일링·평가 프로세스 병렬 상한 32, gdalwarp NUM_THREADS=32, 학습 로더 워커 8(Ultralytics 기본값)
-- 대안: 지시서 원안(8 vCPU 가정: 병렬 7, 워커 6, NUM_THREADS=ALL_CPUS)
-- 이유: Stage 0 측정에서 cgroup CPU 할당량은 54.4코어, RAM 한도는 62GB였다. `nproc`과 sched_getaffinity는 호스트 256코어를 보고하므로 ALL_CPUS는 과다 구독 위험이 있다. 32 프로세스면 학습 로더 8개와 시스템 몫이 남고, 프로세스당 RAM은 약 1.9GB다.
+- 선택: GDAL·타일링·평가 프로세스 병렬 상한 12, gdalwarp NUM_THREADS=12, 학습 로더 워커 8(Ultralytics 기본값)
+- 대안: 이전 파드 값(병렬 32, NUM_THREADS=32), NUM_THREADS=ALL_CPUS
+- 이유: 이 파드의 cgroup CPU 할당량은 13.6코어, RAM 한도는 62GB다. `nproc`은 64를 보고하므로 ALL_CPUS는 과다 구독 위험이 있다. GPU 1장이라 전처리·평가와 학습이 동시에 돌지 않으므로 로더 워커 몫을 따로 뺄 필요가 없고, 시스템 몫 약 1.6코어를 남긴다. 프로세스당 RAM은 약 5GB다.
+- 결과가 지지했는가:
+
+## 학습 타일 I/O
+- 선택: 학습 직전 해당 학습 타일을 /root/tiles_cache로 복사하고 학습 후 삭제한다.
+- 대안: /workspace에서 바로 읽기
+- 이유: /workspace는 네트워크 볼륨(FUSE)으로 순차 650 MB/s, 작은 파일 2000개 읽기 4.40s다. /root는 3.4 GB/s, 0.07s다(docs/env_report.md).
 - 결과가 지지했는가:
