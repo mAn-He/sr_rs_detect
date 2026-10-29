@@ -1,0 +1,28 @@
+# 데이터·가중치·캐시·로그
+data/
+weights/
+cache/
+logs/
+third_party/*
+!third_party/VERSIONS.md
+runs/
+results/**/*.tif
+results/**/*.geojson
+
+# 대용량 래스터·모델 파일
+*.tif
+*.tiff
+*.vrt
+*.pth
+*.pt
+*.pkl
+*.ckpt
+*.safetensors
+*.bin
+*.onnx
+
+# Python
+__pycache__/
+*.pyc
+.ruff_cache/
+.pytest_cache/
