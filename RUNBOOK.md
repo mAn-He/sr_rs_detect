@@ -21,3 +21,9 @@ CONDA_PKGS_DIRS=/workspace/miniforge3/pkgs /workspace/miniforge3/bin/conda clean
 # 칩 위치 목록(헤더만), 창 선택, 창 안 PS-RGB·MS·GeoJSON 다운로드, G1
 /workspace/miniforge3/envs/geo/bin/python run.py data
 ```
+
+## Stage 2 raster (G2~G6)
+
+```bash
+/workspace/miniforge3/envs/geo/bin/python run.py raster
+```

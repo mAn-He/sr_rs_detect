@@ -1,0 +1,1 @@
+MS 동서 메타데이터 정정 전/후: 영상 픽셀값은 바뀌지 않고 geotransform(동서 화소 4×PS, 홀수 열 원점 −2 PS px)만 바뀐다. 초록 HR Canny, 빨강 LR Canny(LR bilinear 확대 후), 노랑 건물 라벨, 배경은 LR 최근접 확대.

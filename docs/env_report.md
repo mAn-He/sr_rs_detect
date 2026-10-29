@@ -84,3 +84,4 @@
 
 ## Stage 1 사용량 (2026-10-29 15:40)
 - `du -sh /workspace`: 97G (상한 160G). data/raw: PS-RGB 2.8G, MS 477M, geojson_buildings 31M. run.py의 `du -sb` 기준 103.4 GB(10^9 B, 상한 판정 150 GB).
+- Stage 2(G2~G6) 후 `du -sh /workspace`: 97G (상한 160G). G2~G6 소요 266.9 s(logs/timing.csv).
