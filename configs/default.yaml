@@ -1,0 +1,33 @@
+# 모든 경로는 root에서 파생한다.
+root: /workspace/rs-sr-detect
+miniforge: /workspace/miniforge3
+weights_dir: /workspace/weights
+tmp_sr: /root/tmp_sr
+tiles_cache: /root/tiles_cache
+
+smoke: true
+seed: 0
+
+enable_resshift: true
+enable_osediff: true
+enable_adcsr: false
+
+# 단계 → 환경 매핑 (docs/env_matrix.md)
+envs:
+  gdal: geo
+  tiles: geo
+  labels: geo
+  sr_interp: geo
+  sr_deep: sr
+  sr_finetune: sr
+  sr_osediff: osediff
+  det_train: geo
+  det_infer: geo
+  merge: geo
+  eval: geo
+  sr_metrics: geo
+  report: geo
+
+# CPU 병렬 (Stage 0 측정: cgroup 13.6코어, RAM 62GB)
+gdal_threads: 12
+n_proc: 12
