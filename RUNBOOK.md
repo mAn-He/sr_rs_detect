@@ -12,4 +12,5 @@ T=$(date +%Y%m%d_%H%M); nohup bash scripts/setup_envs.sh > logs/stage0_setup_$T.
 /workspace/miniforge3/envs/sr/bin/python scripts/verify_env_sr.py
 /workspace/miniforge3/envs/osediff/bin/python scripts/verify_env_osediff.py
 CONDA_PKGS_DIRS=/workspace/cache/conda /workspace/miniforge3/bin/conda clean -a -y --force-pkgs-dirs
+CONDA_PKGS_DIRS=/workspace/miniforge3/pkgs /workspace/miniforge3/bin/conda clean -a -y --force-pkgs-dirs
 ```

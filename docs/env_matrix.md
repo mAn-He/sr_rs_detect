@@ -60,6 +60,6 @@
 |---|---|---|---|---|
 | geo | 3.12 | 최신 안정판 + cu12x | GDAL·rasterio·geopandas·shapely·OpenCV, Ultralytics(D_HR/D_LR 학습·추론), S0/S1, 병합·평가·LPIPS·그림, run.py | 최신 GDAL 계열과 Ultralytics를 같은 환경에서 쓴다 |
 | sr | 3.10 | 2.1.2+cu118, torchvision 0.16.2, xformers 0.0.23.post1 | BasicSR 1.4.2, Real-ESRGAN(S3, S4, S6 학습·추론), SwinIR(S2), ResShift(S5) | ResShift 공식 고정 버전이 BasicSR 1.4.2 허용 범위(torchvision<0.17) 안에 있다. Real-ESRGAN·SwinIR은 고정 버전이 없다 |
-| osediff | 3.10 | 2.0.1+cu118 | OSEDiff(S7) | requirements.txt를 그대로 설치한다 |
+| osediff | 3.10 | 2.0.1+cu117(PyPI 기본 빌드), torchvision 0.15.2, numpy 1.26.4 | OSEDiff(S7) | requirements.txt 고정값을 그대로 설치하고 torchvision·numpy만 추가 고정한다(decisions.md) |
 
 CLAUDE.md의 예상 후보(geo, sr, resshift, osediff 4개)와 다른 점은 sr과 resshift를 합친 것이다. 둘 사이에 충돌하는 고정 버전이 없기 때문이다. verify_env_sr.py에서 S2~S5 최소 추론이 하나라도 실패하면 resshift를 따로 분리한다.

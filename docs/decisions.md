@@ -44,6 +44,12 @@
 - 이유: ResShift(xformers 0.0.23.post1 → torch==2.1.2)와 OSEDiff(xformers 0.0.20 → torch==2.0.1)가 공식 고정 버전으로 충돌한다. BasicSR 1.4.2는 torchvision<0.17이 필요하고, 최신 rasterio·geopandas는 Python ≥3.11이 필요하다. sr과 ResShift 사이에는 충돌이 없다(docs/env_matrix.md).
 - 결과가 지지했는가:
 
+## osediff 환경의 torch 빌드와 추가 고정
+- 선택: torch 2.0.1+cu117(PyPI 기본 빌드), torchvision 0.15.2, numpy 1.26.4. 재설치하지 않는다.
+- 대안: `--extra-index-url https://download.pytorch.org/whl/cu118`로 torch 2.0.1+cu118 설치
+- 이유: OSEDiff requirements.txt는 `torch==2.0.1`만 고정하고 CUDA 빌드는 정하지 않아 PyPI 기본 빌드(cu117)가 설치됐다. RTX 4090(드라이버 CUDA 13.2)에서 `torch.cuda.is_available()` True와 S7 최소 추론을 확인했다(logs/stage0_verify_osediff_20261029_1303.log). torchvision 0.15.2는 torch 2.0.1의 공식 짝으로, basicsr가 버전 없이 끌어오는 torchvision이 torch를 올리지 않게 막고 BasicSR 1.4.2의 torchvision<0.17 조건도 맞춘다. numpy 1.26.4는 NumPy 1.x로 빌드된 torch 2.0.1이 NumPy 2.x에서 깨지지 않게 한다(docs/autofix_log.md 5번).
+- 결과가 지지했는가:
+
 ## S6 시작 가중치
 - 선택: 공식 finetune_realesrgan_x4plus_pairdata.yml을 복사해 pretrain_network_g만 RealESRGAN_x4plus.pth로 바꾸고, netD는 RealESRGAN_x4plus_netD.pth를 쓴다.
 - 대안: 공식 yml 그대로(RealESRNet_x4plus에서 시작)

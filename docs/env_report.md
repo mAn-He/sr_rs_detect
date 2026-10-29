@@ -65,7 +65,8 @@
 - /workspace/cache/conda에는 압축 해제된 패키지 디렉터리 162개(5.0G)가 남았다. MooseFS에서는 하드링크가 만들어지지 않아(링크 수 1) 환경과 파일을 공유하지 않는 복사본이다. 승인 후 `CONDA_PKGS_DIRS=/workspace/cache/conda conda clean -a -y --force-pkgs-dirs`로 삭제했다(logs/stage0_clean_20261029_1316.log). /workspace/miniforge3/pkgs(base 설치분)는 대상이 아니어서 남아 있다.
 - 용량 기준: 볼륨 할당 200GB, 상한 160GB. `du -sh /workspace`로 판단한다(`df`는 클러스터 전체 2.1P를 표시).
 - `du -sh /workspace`: force-pkgs-dirs 정리 전 98G → 후 94G (상한 160G 이내). 내역: miniforge3 34G, Vla_check 33G(다른 프로젝트), .venvs 16G(다른 프로젝트), weights 12G, rs-sr-detect 941M, cache 1K.
-- 09:25 측정 때 29G였던 /workspace/.cache는 12:56 이전에 이미 없어졌다(현재 디렉터리는 12:56:52 osediff verify가 파드 환경 변수 HF_HOME으로 새로 만든 빈 폴더). 이 작업의 명령 중 삭제는 /workspace/cache/pip와 conda 패키지 캐시뿐이라 원인을 특정하지 못했다.
+- 09:25 측정 때 29G였던 /workspace/.cache는 사용자가 이전 세션에서 허용해 삭제한 것이다. 현재 디렉터리는 12:56:52 osediff verify가 파드 환경 변수 HF_HOME으로 새로 만든 빈 폴더다.
+- base 패키지 캐시 /workspace/miniforge3/pkgs(2.3G)는 승인 후 `CONDA_PKGS_DIRS=/workspace/miniforge3/pkgs conda clean -a -y --force-pkgs-dirs`로 삭제했다(logs/stage0_clean_base_20261029_1325.log). conda 26.9.4와 4개 환경 목록 정상. `du -sh /workspace` 94G → 92G.
 
 ## Stage 0 마무리 점검 (2026-10-29 13:16)
 
@@ -78,5 +79,5 @@
 | osediff torch / cuda_available / GPU | 2.0.1+cu117 / True / NVIDIA GeForce RTX 4090 | logs/stage0_verify_osediff_20261029_1303.log |
 | sr xformers와 torch 호환 | 0.0.23.post1+cu118, torch 2.1.2+cu118용 빌드. import와 ResShift(MemoryEfficientAttnBlock) 추론 성공 | logs/stage0_verify_sr_20261029_1303.log, env/sr.lock.txt |
 | VERSIONS.md SD2.1 기록 | 기록됨: Manojb/stable-diffusion-2-1-base, 커밋 0094d483a120f3f33dafbd187ea4aa60d10de75c, safetensors 3개 SHA256 | third_party/VERSIONS.md |
-| autofix_log.md | 파일 없음(저장소·파드 어디에도 없음). 대신 osediff.yml에 공식 requirements.txt에 없는 고정 2개(torchvision==0.15.2, numpy==1.26.4)가 있고, yml 주석이 가리키는 env_report.md에는 그 근거 기록이 없었다. 방법 제외 기록은 없다(S8 AdcSR은 config 기본값 false). | env/osediff.yml, third_party/OSEDiff/requirements.txt |
-| 정리 후 du -sh /workspace | 94G / 상한 160G | logs/stage0_clean_20261029_1316.log, 위 사용량 절 |
+| autofix_log.md | 점검 시점에는 파일 없음 → 이후 docs/autofix_log.md를 만들어 Stage 0 수정 5건을 소급 기록. 점검 당시 osediff.yml에 공식 requirements.txt에 없는 고정 2개(torchvision==0.15.2, numpy==1.26.4)가 있고, yml 주석이 가리키는 env_report.md에는 그 근거 기록이 없었다. 방법 제외 기록은 없다(S8 AdcSR은 config 기본값 false). | env/osediff.yml, third_party/OSEDiff/requirements.txt |
+| 정리 후 du -sh /workspace | 92G / 상한 160G | logs/stage0_clean_20261029_1316.log, logs/stage0_clean_base_20261029_1325.log |
