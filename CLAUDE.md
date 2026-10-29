@@ -82,6 +82,7 @@ E5. 설치와 재현성: Miniforge를 /workspace/miniforge3에 설치하고 GDAL
 - 모델 가중치와 의존 모델(SD2.1-base, RAM, DAPE 등)은 /workspace/weights에 한 번만 받는다.
 - CONDA_PKGS_DIRS와 PIP_CACHE_DIR를 /workspace/cache로 지정하고, 설치 직후 `conda clean -a -y`와 pip 캐시를 삭제한다.
 - Stage마다 `du -sh /workspace/*`를 env_report.md에 기록하고, 사용량이 볼륨의 80%를 넘으면 멈추고 보고한다.
+  볼륨 할당은 200GB, 상한은 160GB(80%)이며 `du -sh /workspace` 값으로 판단한다(`df`는 MooseFS 클러스터 전체를 표시해 쓰지 않는다).
 
 # 학습·처리 가속 (공식 옵션만 사용, 별도 분산 코드 작성 금지)
 - Stage 0에서 `nproc`, `free -h`, `nvidia-smi`, `df -h`와 /workspace 읽기 속도를 측정해 env_report.md에 기록하고, 이 값으로 아래 설정의 기본값을 정한다.
