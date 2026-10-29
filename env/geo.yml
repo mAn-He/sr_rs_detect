@@ -1,0 +1,22 @@
+# geo: GDAL 계열(conda-forge) + Ultralytics + 평가·그림
+name: geo
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - gdal=3.13.3
+  - rasterio
+  - geopandas
+  - shapely
+  - pyproj
+  - pyyaml
+  - pip
+  - pip:
+      - torch==2.15.0
+      - torchvision==0.29.2
+      - ultralytics==8.4.192
+      - lpips==0.1.4
+      - scikit-image==0.26.0
+      - pytest
+      - ruff
+      - vulture

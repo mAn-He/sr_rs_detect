@@ -1,0 +1,37 @@
+# sr: BasicSR 1.4.2, Real-ESRGAN, SwinIR, ResShift
+# torch/xformers/numpy 등은 ResShift journal 브랜치 environment.yml의 고정 버전을 따른다.
+# basicsr(소스 배포만 있음, setup.py가 torch를 import)와 Real-ESRGAN은 setup_envs.sh에서 --no-build-isolation으로 설치한다.
+name: sr
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10.13
+  - pip
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu118
+      - torch==2.1.2+cu118
+      - torchvision==0.16.2+cu118
+      - xformers==0.0.23.post1+cu118
+      - numpy==1.26.3
+      - pillow==10.0.1
+      - pyyaml==6.0.1
+      - requests==2.31.0
+      - addict==2.4.0
+      - albumentations==1.3.1
+      - einops==0.7.0
+      - imageio==2.33.1
+      - lmdb==1.4.1
+      - loguru==0.7.2
+      - lpips==0.1.4
+      - matplotlib==3.8.2
+      - omegaconf==2.3.0
+      - opencv-python==4.8.0.74
+      - pandas==2.1.4
+      - scikit-image==0.22.0
+      - scikit-learn==1.3.2
+      - scipy==1.11.4
+      - six==1.16.0
+      - timm==0.9.12
+      - tqdm==4.66.1
+      - yapf==0.40.2
+      - loralib==0.1.2

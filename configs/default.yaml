@@ -31,3 +31,4 @@ envs:
 # CPU 병렬 (Stage 0 측정: cgroup 13.6코어, RAM 62GB)
 gdal_threads: 12
 n_proc: 12
+cache_dir: /workspace/cache

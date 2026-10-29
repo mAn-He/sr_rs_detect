@@ -1,0 +1,24 @@
+# osediff: OSEDiff requirements.txt 고정 버전 그대로. basicsr는 setup_envs.sh에서 --no-build-isolation으로 설치한다.
+# numpy는 torch 2.0.1이 NumPy 1.x로 빌드되어 1.26.4로, torchvision은 basicsr가 torch를 올리지 않도록 2.0.1의 짝인 0.15.2로 고정한다(docs/env_report.md).
+name: osediff
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - torch==2.0.1
+      - torchvision==0.15.2
+      - diffusers==0.25.0
+      - transformers==4.28.1
+      - xformers==0.0.20
+      - einops==0.7.0
+      - open-clip-torch==2.20.0
+      - peft==0.9.0
+      - Pillow==9.5.0
+      - PyYAML==6.0
+      - pyiqa==0.1.10
+      - huggingface_hub==0.25.0
+      - loralib
+      - fairscale
+      - numpy==1.26.4
