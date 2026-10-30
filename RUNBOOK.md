@@ -40,3 +40,13 @@ $P run.py sr > logs/smoke_sr_$(date +%Y%m%d_%H%M).log 2>&1
 $P run.py eval > logs/smoke_eval_$(date +%Y%m%d_%H%M).log 2>&1
 PROJ_DATA=/workspace/miniforge3/envs/geo/share/proj $P -m pytest -q tests
 ```
+
+## 전체 실행 (configs/default.yaml smoke: false, 2026-10-30 성공)
+
+```bash
+# 결과는 data/full, runs/full, results/. 탐지기 학습 후 정지 지점에서 사용자 확인.
+P=/workspace/miniforge3/envs/geo/bin/python
+T=$(date +%Y%m%d_%H%M%S); nohup $P run.py data raster tiles_labels train_det det_calib > logs/full_$T.log 2>&1 &
+# max_det_min 1000 → 3000 변경 후(사용자 결정): label_stats.json만 갱신, D_LR 200에폭 민감도 학습, val 보정 재실행
+T=$(date +%Y%m%d_%H%M%S); nohup bash -c "set -e; PROJ_DATA=/workspace/miniforge3/envs/geo/share/proj $P src/labels.py && $P run.py det_sens det_calib" > logs/det_sens_calib_$T.log 2>&1 &
+```

@@ -62,11 +62,16 @@ imgsz_lr: 256
 epochs: 100          # Ultralytics 공식 기본값. smoke는 smoke_epochs
 smoke_epochs: 1
 patience: 20
+# D_LR 수렴 민감도(사전 고정 기준): 같은 설정에 epochs만 d_lr_sens_epochs로 학습한 D_LR_e<epochs>의 LR val 지리 AP50이
+# D_LR보다 d_lr_sens_min_gain 이상 높으면 D_HR·D_LR을 그 에폭으로 재학습한다(geo_eval.py val이 판정).
+d_lr_sens_epochs: 200
+d_lr_sens_min_gain: 0.01
 batch: 0.80          # 공식 AutoBatch: GPU 메모리 80%
 workers: 8
-# 학습 val·추론 max_det = max(max_det_min, max_det_factor × train·val 타일당 GT 최대 개수)(labels.py → label_stats.json)
+# 학습 val·추론 max_det = max(max_det_min, max_det_factor × train·val 타일당 GT 최대 개수)(labels.py → label_stats.json).
+# 1000에서 HR val 101타일 중 33타일이 상한에 걸려 3000으로 올렸다(decisions.md '평가 세부 정의').
 max_det_factor: 3
-max_det_min: 1000
+max_det_min: 3000
 det_cache: disk     # Ultralytics cache='disk'(디코딩한 .npy를 tiles_cache에 저장, 학습 후 삭제)
 deterministic: true # Ultralytics 공식 옵션(기본값 true), seed와 함께 고정
 # AP용 예측은 Ultralytics val 기본 conf 0.001. 운영 conf와 타일 병합 NMS IoU는 val 블록에서만 정한다(geo_eval.py val):

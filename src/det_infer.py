@@ -1,5 +1,6 @@
 """탐지(Ultralytics 공식 predict API, conf det_conf_ap, max_det는 label_stats.json).
-- val: D_HR on HR, D_LR on LR val 타일. 병합 IoU·운영 conf를 정하는 데만 쓴다(geo_eval.py val).
+- val: D_HR on HR, D_LR on LR, D_LR_e<d_lr_sens_epochs> on LR(수렴 민감도) val 타일. 병합 IoU·운영 conf와 민감도 판정에만 쓴다
+  (geo_eval.py val).
 - test: D_HR on HR(상한), D_LR on LR(경로 1), D_HR on 각 SR(경로 2) test 타일.
 타일 픽셀 좌표의 OBB 4점과 conf를 W/preds/<split>/<행>.csv에 남긴다. test에서는 km²당 탐지 시간(모델 로딩·예열 제외)과
 로딩·예열 시간을 W/det_timing.csv에, Ultralytics val 지표(타일 단위)를 results/det_val_tile.csv에 기록한다(결론은 지리 평가 기준)."""
@@ -19,6 +20,9 @@ def rows(split):
     run = g.ROOT / 'runs' / g.W.name
     out = [('HR', run / 'D_HR/weights/best.pt', g.W / f'tiles/hr/images/{split}', g.CFG['imgsz_hr']),
            ('LR', run / 'D_LR/weights/best.pt', g.W / f'tiles/lr/images/{split}', g.CFG['imgsz_lr'])]
+    if split == 'val':
+        e = g.CFG['d_lr_sens_epochs']
+        out.append((f'LR_e{e}', run / f'D_LR_e{e}/weights/best.pt', g.W / 'tiles/lr/images/val', g.CFG['imgsz_lr']))
     if split == 'test':
         out += [(m, run / 'D_HR/weights/best.pt', g.W / 'sr' / m / 'images/test', g.CFG['imgsz_hr'])
                 for m in g.CFG['sr_methods'] if ENABLED.get(m, True)]
@@ -53,7 +57,8 @@ def main(split):
         df = pd.DataFrame(recs, columns=cols)
         df.to_csv(out / f'{name}.csv', index=False)
         per_tile = df.groupby('tile_id').size()
-        print(f'{split} {name}: {len(df)} predictions, max per tile {per_tile.max()} (max_det {max_det})')
+        print(f'{split} {name}: {len(df)} predictions, max per tile {per_tile.max()}, '
+              f'{(per_tile >= max_det).sum()} tiles at max_det {max_det}')
         if split == 'val':
             continue
         # 타일 단위 val: 이미지 폴더의 상위에 labels/test가 있어야 하므로 SR 행은 HR 라벨 폴더를 링크한다.
@@ -69,6 +74,7 @@ def main(split):
                       project=str(g.ROOT / 'runs' / g.W.name / 'val'), name=name, exist_ok=True)
         timing.append({'method': name, 'seconds': round(sec, 2), 'load_sec': round(load, 2), 'km2': km2,
                        'n_pred': len(df), 'max_pred_per_tile': int(per_tile.max()),
+                       'tiles_at_max_det': int((per_tile >= max_det).sum()),
                        'tile_mAP50': float(v.results_dict['metrics/mAP50(B)'])})
         print(timing[-1])
     if split == 'test':
