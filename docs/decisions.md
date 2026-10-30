@@ -21,7 +21,7 @@
 - 결과가 지지했는가:
 
 ## 학습 예산
-- 선택: YOLO epochs=100(공식 기본값), patience=20, batch=0.80(공식 AutoBatch, GPU 메모리 80%), workers=8, D_HR·D_LR 각각 3시간 상한. S6은 공식 paired data 파인튜닝 설정(total_iter 400k, milestones [400k])에서 출발해 3시간 이내로 반복 횟수를 줄인다: 본 실행 데이터로 300회를 돌려 로그 시각으로 반복당 시간을 재고, 3시간 × 0.9(체크포인트 저장·로더 변동 여유) 안에 끝나는 반복 수(100 단위 내림)로 정한다. milestones는 400k 대비 같은 비율로 줄인다(공식 설정이 milestone = total_iter라 줄인 뒤에도 마지막 반복에만 걸린다). 추론에는 마지막 체크포인트를 쓰고, 학습 후 가중치가 바뀌었는지 assert한다(사용자 결정 2026-10-30). 실제 배치 값과 S6 반복 횟수는 results/det_D_*.json, data/full/s6_finetune.json에 남기고 Stage 7에서 이 항목에 적는다.
+- 선택: YOLO epochs=200(공식 기본값 100에서 'D_LR 수렴 민감도' 판정으로 변경, 사용자 사전 결정 2026-10-30), patience=20, batch=0.80(공식 AutoBatch, GPU 메모리 80%), workers=8, D_HR·D_LR 각각 3시간 상한. S6은 공식 paired data 파인튜닝 설정(total_iter 400k, milestones [400k])에서 출발해 3시간 이내로 반복 횟수를 줄인다: 본 실행 데이터로 300회를 돌려 로그 시각으로 반복당 시간을 재고, 3시간 × 0.9(체크포인트 저장·로더 변동 여유) 안에 끝나는 반복 수(100 단위 내림)로 정한다. milestones는 400k 대비 같은 비율로 줄인다(공식 설정이 milestone = total_iter라 줄인 뒤에도 마지막 반복에만 걸린다). 추론에는 마지막 체크포인트를 쓰고, 학습 후 가중치가 바뀌었는지 assert한다(사용자 결정 2026-10-30). 실제 배치 값과 S6 반복 횟수는 results/det_D_*.json, data/full/s6_finetune.json에 남기고 Stage 7에서 이 항목에 적는다.
 - 대안: 공식 기본 patience=100(에폭 100과 같아 조기 종료가 사실상 없음), OOM 지점을 직접 찾아 80%를 곱하는 방식
 - 이유: RTX 4090 1장에서 전체 실험 시간을 제한한다. batch=0.80은 "메모리 부족이 나지 않는 최대값의 약 80%"를 공식 옵션으로 구현한 것이다(의미가 완전히 같지는 않다: 배치 최대값이 아니라 메모리 사용률 80%를 목표로 한다).
 - 결과가 지지했는가:
@@ -172,4 +172,5 @@
 - 선택: D_LR이 epochs 100 상한까지 조기 종료 없이 돌아(최고 94에폭) 덜 수렴했을 수 있어, 같은 설정에 epochs만 200(patience 20)으로 바꾼 D_LR_e200을 별도 이름으로 학습한다. 판정 기준(결과를 보기 전 고정): LR val 지리 AP50(병합 IoU는 보정값, 제외 폭 8 LR px)이 D_LR보다 0.01 이상 높으면 D_HR·D_LR을 모두 epochs 200으로 재학습하고 보정을 다시 한다. 0.01 미만이면 기존 모델을 유지하고 민감도 결과를 README에 적는다. 판정은 geo_eval.py val이 results/det_calibration.json의 D_LR_e200_sensitivity에 남긴다.
 - 대안: D_LR만 200에폭으로 바꾸기(같은 에폭 예산 원칙 위반), 민감도 없이 진행
 - 이유: 경로 1(하한)이 덜 학습되면 gain이 부풀려진다. 두 탐지기에 같은 에폭 예산을 유지하려고 재학습은 둘 다 한다.
+- 결과(커밋 da7fe24, results/det_calibration_e100.json의 D_LR_e200_sensitivity, results/det_D_LR_e200.json): D_LR_e200도 조기 종료 없이 200에폭을 모두 돌았다(0.32시간, 배치 254). LR val 지리 AP50 0.6743 대 D_LR 0.6619, 차이 +0.0124 ≥ 0.01 → 기준대로 D_HR·D_LR을 epochs 200으로 재학습하고 보정을 다시 한다(configs/default.yaml epochs 200). 타일 단위 val mAP50은 0.730 대 0.713. 100에폭 모델과 결과는 runs/full/D_*_e100, results/det_D_*_e100*로 보존한다. 민감도 학습·판정 코드는 판정 뒤 쓰이지 않아 지웠다(da7fe24에 남아 있다).
 - 결과가 지지했는가:

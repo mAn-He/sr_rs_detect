@@ -158,21 +158,12 @@ def calibrate():
         iou, rule = max(ap, key=ap.get), 'higher AP50'
     lr = evaluate(load_pred(d / f'LR_iou{iou}.geojson', region), gt_obb, len(gt))
     print(f'val D_LR IoU {iou}:', lr)
-    # D_LR 수렴 민감도: epochs만 늘린 D_LR_e<e>의 AP50 향상이 d_lr_sens_min_gain 이상이면 두 탐지기를 그 에폭으로 재학습한다.
-    e = g.CFG['d_lr_sens_epochs']
-    lr_e = evaluate(load_pred(d / f'LR_e{e}_iou{iou}.geojson', region), gt_obb, len(gt))
-    lr_e['gain_vs_D_LR'] = lr_e['AP50'] - lr['AP50']
-    lr_e['decision'] = (f'retrain D_HR and D_LR with epochs {e}' if lr_e['gain_vs_D_LR'] >= g.CFG['d_lr_sens_min_gain']
-                        else 'keep D_HR and D_LR (epochs ' + str(g.CFG['epochs']) + ')')
-    tr = json.loads((g.ROOT / f'results/det_D_LR_e{e}.json').read_text())
-    lr_e.update(tr['args'] | {'epochs_run': tr['epochs_run']})
-    print(f'val D_LR_e{e} IoU {iou}:', lr_e)
     max_det = json.loads((g.W / 'label_stats.json').read_text())['max_det']
     at_cap = {n: int((pd.read_csv(d / f'{n}.csv').groupby('tile_id').size() >= max_det).sum())
-              for n in ('HR', 'LR', f'LR_e{e}')}
+              for n in ('HR', 'LR')}
     out = {'split': 'val', 'buffer_lr': buf, 'n_gt': len(gt), 'nms_iou': iou, 'nms_iou_rule': rule,
            'conf_op': {'D_HR': cand[iou]['conf_op'], 'D_LR': lr['conf_op']},
-           'D_HR_candidates': {str(k): v for k, v in cand.items()}, 'D_LR': lr, f'D_LR_e{e}_sensitivity': lr_e,
+           'D_HR_candidates': {str(k): v for k, v in cand.items()}, 'D_LR': lr,
            'max_det': max_det, 'tiles_at_max_det': at_cap}
     (g.ROOT / 'results/det_calibration.json').write_text(json.dumps(out, indent=1))
     print(json.dumps(out, indent=1))

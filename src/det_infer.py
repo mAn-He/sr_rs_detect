@@ -1,6 +1,5 @@
 """탐지(Ultralytics 공식 predict API, conf det_conf_ap, max_det는 label_stats.json).
-- val: D_HR on HR, D_LR on LR, D_LR_e<d_lr_sens_epochs> on LR(수렴 민감도) val 타일. 병합 IoU·운영 conf와 민감도 판정에만 쓴다
-  (geo_eval.py val).
+- val: D_HR on HR, D_LR on LR val 타일. 병합 IoU·운영 conf를 정하는 데만 쓴다(geo_eval.py val).
 - test: D_HR on HR(상한), D_LR on LR(경로 1), D_HR on 각 SR(경로 2) test 타일.
 타일 픽셀 좌표의 OBB 4점과 conf를 W/preds/<split>/<행>.csv에 남긴다. test에서는 km²당 탐지 시간(모델 로딩·예열 제외)과
 로딩·예열 시간을 W/det_timing.csv에, Ultralytics val 지표(타일 단위)를 results/det_val_tile.csv에 기록한다(결론은 지리 평가 기준)."""
@@ -20,9 +19,6 @@ def rows(split):
     run = g.ROOT / 'runs' / g.W.name
     out = [('HR', run / 'D_HR/weights/best.pt', g.W / f'tiles/hr/images/{split}', g.CFG['imgsz_hr']),
            ('LR', run / 'D_LR/weights/best.pt', g.W / f'tiles/lr/images/{split}', g.CFG['imgsz_lr'])]
-    if split == 'val':
-        e = g.CFG['d_lr_sens_epochs']
-        out.append((f'LR_e{e}', run / f'D_LR_e{e}/weights/best.pt', g.W / 'tiles/lr/images/val', g.CFG['imgsz_lr']))
     if split == 'test':
         out += [(m, run / 'D_HR/weights/best.pt', g.W / 'sr' / m / 'images/test', g.CFG['imgsz_hr'])
                 for m in g.CFG['sr_methods'] if ENABLED.get(m, True)]

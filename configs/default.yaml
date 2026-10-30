@@ -59,13 +59,9 @@ label_min_frac: 0.5
 yolo_weights: yolo26s-obb.pt
 imgsz_hr: 1024
 imgsz_lr: 256
-epochs: 100          # Ultralytics 공식 기본값. smoke는 smoke_epochs
+epochs: 200          # 공식 기본값 100에서 D_LR 수렴 민감도 판정으로 200(decisions.md, 사용자 결정 2026-10-30). smoke는 smoke_epochs
 smoke_epochs: 1
 patience: 20
-# D_LR 수렴 민감도(사전 고정 기준): 같은 설정에 epochs만 d_lr_sens_epochs로 학습한 D_LR_e<epochs>의 LR val 지리 AP50이
-# D_LR보다 d_lr_sens_min_gain 이상 높으면 D_HR·D_LR을 그 에폭으로 재학습한다(geo_eval.py val이 판정).
-d_lr_sens_epochs: 200
-d_lr_sens_min_gain: 0.01
 batch: 0.80          # 공식 AutoBatch: GPU 메모리 80%
 workers: 8
 # 학습 val·추론 max_det = max(max_det_min, max_det_factor × train·val 타일당 GT 최대 개수)(labels.py → label_stats.json).

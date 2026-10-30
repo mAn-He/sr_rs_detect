@@ -47,6 +47,9 @@ PROJ_DATA=/workspace/miniforge3/envs/geo/share/proj $P -m pytest -q tests
 # 결과는 data/full, runs/full, results/. 탐지기 학습 후 정지 지점에서 사용자 확인.
 P=/workspace/miniforge3/envs/geo/bin/python
 T=$(date +%Y%m%d_%H%M%S); nohup $P run.py data raster tiles_labels train_det det_calib > logs/full_$T.log 2>&1 &
-# max_det_min 1000 → 3000 변경 후(사용자 결정): label_stats.json만 갱신, D_LR 200에폭 민감도 학습, val 보정 재실행
+# max_det_min 1000 → 3000 변경 후(사용자 결정): label_stats.json만 갱신, D_LR 200에폭 민감도 학습(det_sens, 커밋 da7fe24), val 보정 재실행
 T=$(date +%Y%m%d_%H%M%S); nohup bash -c "set -e; PROJ_DATA=/workspace/miniforge3/envs/geo/share/proj $P src/labels.py && $P run.py det_sens det_calib" > logs/det_sens_calib_$T.log 2>&1 &
+# D_LR 민감도 판정(+0.0124 ≥ 0.01)에 따라 epochs 200으로 재학습(100에폭 결과는 runs/full/D_*_e100으로 mv). 민감도 코드는 커밋 da7fe24.
+mv runs/full/D_HR runs/full/D_HR_e100 && mv runs/full/D_LR runs/full/D_LR_e100
+T=$(date +%Y%m%d_%H%M%S); nohup $P run.py train_det det_calib sr > logs/full_e200_sr_$T.log 2>&1 &
 ```

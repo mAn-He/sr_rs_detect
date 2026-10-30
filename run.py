@@ -23,8 +23,6 @@ STAGES = {
     'raster': [('py', 'src/gdal_ops.py', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7')],
     'tiles_labels': [('py', 'src/tiling.py'), ('py', 'src/labels.py')],
     'train_det': [('py', 'src/det_train.py', 'hr'), ('py', 'src/det_train.py', 'lr')],
-    # D_LR 수렴 민감도: epochs만 d_lr_sens_epochs로 바꾼 별도 이름 D_LR_e<epochs>.
-    'det_sens': [('py', 'src/det_train.py', 'lr_sens')],
     # 학습 후 val 블록에서만 타일 병합 NMS IoU와 운영 conf를 정하고 민감도를 판정한다(results/det_calibration.json).
     'det_calib': [('py', 'src/det_infer.py', 'val'), ('py', 'src/merge.py', 'val'), ('py', 'src/geo_eval.py', 'val')],
     'sr': [('py', 'src/sr_run.py', 'S2_swinir_classical_x4', 'S3_realesrnet_x4plus', 'S4_realesrgan_x4plus',
