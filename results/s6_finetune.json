@@ -1,0 +1,21 @@
+{
+ "name": "S6_realesrgan_ft_spacenet",
+ "total_iter": 23600,
+ "milestones": [
+  23600
+ ],
+ "official_total_iter": 400000,
+ "measure_iter": 300,
+ "sec_per_iter": 0.4117,
+ "measure_seconds": 166.3,
+ "budget_h": 3,
+ "budget_use": 0.9,
+ "n_pairs": 433,
+ "dataset_enlarge_ratio": 1,
+ "max_abs_weight_change": 0.2369513213634491,
+ "seconds": 9481.0,
+ "batch_size_per_gpu": 12,
+ "gt_size": 256,
+ "net_g": "/workspace/rs-sr-detect/third_party/Real-ESRGAN/experiments/S6_realesrgan_ft_spacenet/models/net_g_latest.pth",
+ "train_log": "/workspace/rs-sr-detect/third_party/Real-ESRGAN/experiments/S6_realesrgan_ft_spacenet/train_S6_realesrgan_ft_spacenet_20261030_091613.log"
+}
