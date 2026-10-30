@@ -56,3 +56,13 @@ T=$(date +%Y%m%d_%H%M%S); nohup $P run.py train_det det_calib sr > logs/full_e20
 cp data/full/s6_finetune.json results/s6_finetune.json
 T=$(date +%Y%m%d_%H%M%S); nohup $P run.py eval > logs/full_eval_$T.log 2>&1 &
 ```
+
+## 사후 분석과 결과 리포트 뷰어 (2026-10-30 성공)
+
+```bash
+P=/workspace/miniforge3/envs/geo/bin/python
+# 사후 분석(주 결론 아님, docs/frozen_eval.md 재실행 기록) → results/posthoc/, results/figures/qualitative_*.png
+T=$(date +%Y%m%d_%H%M%S); nohup $P run.py posthoc > logs/posthoc_$T.log 2>&1 &
+# 리포트 뷰어(기존 결과만 읽음) → results/report/full/index.html + images/, results/report/highlights.html
+T=$(date +%Y%m%d_%H%M%S); nohup $P run.py report_viewer > logs/report_viewer_$T.log 2>&1 &
+```

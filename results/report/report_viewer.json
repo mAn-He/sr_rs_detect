@@ -1,0 +1,29 @@
+{
+ "full_index": "results/report/full/index.html",
+ "full_mb": 274.8,
+ "full_files": 22952,
+ "highlights": "results/report/highlights.html",
+ "highlights_mb": 10.1,
+ "highlights_quality": {
+  "img": 80,
+  "map": 70,
+  "crops": false,
+  "diff_px": 256
+ },
+ "diff_vmax": 105.0,
+ "tiles": 96,
+ "methods": [
+  "HR",
+  "LR",
+  "S0_gdal_cubic",
+  "S1_gdal_lanczos",
+  "S2_swinir_classical_x4",
+  "S3_realesrnet_x4plus",
+  "S4_realesrgan_x4plus",
+  "S5_resshift_v3_x4",
+  "S6_realesrgan_ft_spacenet",
+  "S7_osediff_x4",
+  "S0_color",
+  "S3_color"
+ ]
+}

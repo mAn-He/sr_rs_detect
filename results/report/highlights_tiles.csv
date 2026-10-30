@@ -1,0 +1,13 @@
+tile_id,rule,value,n_gt
+b083_r1c1,S6 gain top (F1 S6 − LR),0.2471,11
+b041_r1c0,S6 gain top (F1 S6 − LR),0.2249,47
+b147_r0c0,S6 gain top (F1 S6 − LR),0.1341,142
+b075_r0c1,S6 loss top (F1 S6 − LR),-0.1283,32
+b075_r0c0,S6 loss top (F1 S6 − LR),-0.0606,13
+b032_r0c0,S4 loss top (F1 S4 − LR),-0.2727,33
+b130_r1c0,S4 loss top (F1 S4 − LR),-0.216,77
+b165_r1c1,S7 loss top (F1 S7 − LR),-0.5023,17
+b003_r1c0,S7 loss top (F1 S7 − LR),-0.4035,19
+b156_r1c0,S3 over S0 top (F1 S3 − S0),0.4666,46
+b105_r1c1,near median S6 gain (|F1 S6 − LR − median|),0.0295,21
+b132_r0c1,near median S6 gain (|F1 S6 − LR − median|),0.0265,47
