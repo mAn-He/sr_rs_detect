@@ -5,7 +5,15 @@
  "epochs_run": 1,
  "best": "/workspace/rs-sr-detect/runs/smoke/D_HR/weights/best.pt",
  "n_train_images": 4,
- "cache": "ram",
+ "args": {
+  "seed": 0,
+  "deterministic": true,
+  "cache": "disk",
+  "max_det": 1000,
+  "workers": 8,
+  "epochs": 1,
+  "patience": 20
+ },
  "val_metrics": {
   "metrics/precision(B)": 0.016717325227963525,
   "metrics/recall(B)": 0.13414634146341464,

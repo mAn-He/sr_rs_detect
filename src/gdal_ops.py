@@ -381,11 +381,13 @@ def tile_mask(transform, shape, fp):
     return rasterize([fp], out_shape=shape, transform=transform, dtype=np.uint8).astype(bool)
 
 
-def log_sr_time(method, seconds, km2):
-    """SR 처리 시간(처리한 면적 기준)을 W/sr_timing.csv에 방법별 한 행으로 남긴다."""
+def log_sr_time(method, seconds, km2, load_sec, seconds_total):
+    """SR 처리 시간(모델 로딩 제외, 처리한 면적 기준), 로딩 시간, 전체 실행 시간을 W/sr_timing.csv에 방법별 한 행으로 남긴다."""
     f = W / 'sr_timing.csv'
-    df = pd.read_csv(f) if f.exists() else pd.DataFrame(columns=['method', 'seconds', 'km2'])
-    row = pd.DataFrame([{'method': method, 'seconds': round(seconds, 2), 'km2': km2}])
+    df = pd.read_csv(f) if f.exists() else pd.DataFrame(columns=['method', 'seconds', 'km2', 'load_sec', 'seconds_total'])
+    row = pd.DataFrame([{'method': method, 'seconds': round(seconds, 2), 'km2': km2,
+                         'load_sec': np.round(load_sec, 2),
+                         'seconds_total': round(seconds_total, 2)}])
     pd.concat([df[df.method != method], row]).to_csv(f, index=False)
 
 
@@ -406,7 +408,9 @@ def g7():
             with rasterio.open(out, 'r+') as dst:
                 assert np.allclose(dst.res, (HR, HR)) and dst.shape == (round(B / HR),) * 2, (dst.res, dst.shape)
                 dst.write(filled(dst.read(), tile_mask(dst.transform, dst.shape, fp), hr_fill))
-        log_sr_time(method, time.time() - t0, len(test) * B**2 / 1e6)
+        # 보간은 불러올 모델이 없어 로딩 시간이 없다(NaN).
+        sec = time.time() - t0
+        log_sr_time(method, sec, len(test) * B**2 / 1e6, np.nan, sec)
     # HR / LR(최근접 4배) / S0 비교 PNG 3장: test 블록 안쪽·유효 영역 안쪽 60 m의 건물 중심 3곳(시드 고정), 120 m(400 HR px).
     bld = gpd.read_file(W / 'buildings_utm.geojson')
     cen = bld.geometry.centroid

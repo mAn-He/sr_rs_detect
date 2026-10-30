@@ -22,18 +22,26 @@ STAGES = {
     'data': [('bash', 'scripts/download_data.sh'), ('py', 'src/gdal_ops.py', 'g1')],
     'raster': [('py', 'src/gdal_ops.py', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7')],
     'tiles_labels': [('py', 'src/tiling.py'), ('py', 'src/labels.py')],
-    'train_det': [('py', 'src/det_train.py', 'hr'), ('py', 'src/det_train.py', 'lr')],
+    # 학습 후 val 블록에서만 타일 병합 NMS IoU와 운영 conf를 정한다(results/det_calibration.json).
+    'train_det': [('py', 'src/det_train.py', 'hr'), ('py', 'src/det_train.py', 'lr'), ('py', 'src/det_infer.py', 'val'),
+                  ('py', 'src/merge.py', 'val'), ('py', 'src/geo_eval.py', 'val')],
     'sr': [('py', 'src/sr_run.py', 'S2_swinir_classical_x4', 'S3_realesrnet_x4plus', 'S4_realesrgan_x4plus',
             'S5_resshift_v3_x4', 'S7_osediff_x4'),
            ('py', 'src/sr_finetune.py'), ('py', 'src/sr_run.py', 'S6_realesrgan_ft_spacenet'),
            ('py', 'src/sr_metrics.py')],
-    'eval': [('py', 'src/det_infer.py'), ('py', 'src/merge.py'), ('py', 'src/geo_eval.py'), ('py', 'src/report.py')],
+    'eval': [('py', 'src/det_infer.py', 'test'), ('py', 'src/merge.py', 'test'), ('py', 'src/geo_eval.py', 'test'),
+             ('py', 'src/report.py')],
 }
 
 
-def du_gb():
-    out = subprocess.run(['du', '-sb', '/workspace'], capture_output=True, text=True, check=True)
-    return int(out.stdout.split()[0]) / 1e9
+def du_gb(paths):
+    out = subprocess.run(['du', '-sbc', *map(str, paths)], capture_output=True, text=True, check=True)
+    return int(out.stdout.splitlines()[-1].split()[0]) / 1e9
+
+
+# 용량 감시: 프로젝트 밖 폴더(Vla_check, .venvs, miniforge3, weights 등, 단계 실행 중 바뀌지 않음)는 실행 시작 때 한 번만 재고,
+# 단계마다 프로젝트 폴더만 du 해서 합으로 판단한다.
+FIXED_GB = du_gb([p for p in Path('/workspace').iterdir() if p != ROOT])
 
 
 def ram_gb():
@@ -58,11 +66,12 @@ class Monitor(threading.Thread):
             self.ram.append(ram_gb())
 
 
-cols = ['start', 'stage', 'step', 'seconds', 'smoke', 'workspace_gb', 'gpu_util_mean', 'gpu_util_max', 'gpu_mem_max_mb',
+cols = ['start', 'stage', 'step', 'seconds', 'smoke', 'workspace_gb', 'project_gb', 'gpu_util_mean', 'gpu_util_max', 'gpu_mem_max_mb',
         'ram_max_gb', 'cpu_util_mean']
 for stage in sys.argv[1:]:
     for kind, *cmd in STAGES[stage]:
-        used = du_gb()
+        project = du_gb([ROOT])
+        used = FIXED_GB + project
         assert used < DU_LIMIT_GB, f'/workspace uses {used:.1f} GB >= {DU_LIMIT_GB} GB, stop and report'
         prefix = f"{CFG['miniforge']}/envs/{CFG['envs']['gdal']}"
         exe = 'bash' if kind == 'bash' else f'{prefix}/bin/python'
@@ -83,6 +92,6 @@ for stage in sys.argv[1:]:
             w = csv.writer(f)
             if f.tell() == 0:
                 w.writerow(cols)
-            w.writerow([start, stage, ' '.join(cmd), round(sec, 1), CFG['smoke'], round(used, 1),
+            w.writerow([start, stage, ' '.join(cmd), round(sec, 1), CFG['smoke'], round(used, 1), round(project, 2),
                         round(sum(mon.gpu) / max(len(mon.gpu), 1), 1), max(mon.gpu, default=0), max(mon.gmem, default=0),
                         round(max(mon.ram, default=0), 1), round(cpu, 3)])

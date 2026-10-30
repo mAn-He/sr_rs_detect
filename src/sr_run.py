@@ -1,6 +1,9 @@
 """S2~S7: test LR 타일에 공식 SR 스크립트를 실행하고(공식 환경의 python, subprocess) 결과를 G8 규칙으로 GeoTIFF 저장.
 공식 스크립트가 GeoTIFF를 읽지 못하는 S5·S7은 tmp_sr에 임시 PNG 입력을 만들고, 모든 임시 파일은 G8 검사 후 삭제한다.
-S0·S1은 gdal_ops.g7(보간)과 tiling(타일 자르기)에서 만든다."""
+S0·S1은 gdal_ops.g7(보간)과 tiling(타일 자르기)에서 만든다.
+처리 시간에서 모델 로딩을 빼기 위해 공식 스크립트가 순서대로 쓰는 출력 파일의 수정 시각을 쓴다:
+타일당 시간 = (마지막 출력 시각 − 첫 출력 시각)/(n − 1), 로딩 시간 = (첫 출력 시각 − 시작 시각) − 타일당 시간,
+처리 시간 = n × 타일당 시간으로 W/sr_timing.csv에 남긴다."""
 import json
 import shutil
 import subprocess
@@ -16,6 +19,7 @@ import gdal_ops as g
 TP = g.ROOT / 'third_party'
 WT = Path(g.CFG['weights_dir'])
 ENABLED = {'S5_resshift_v3_x4': g.CFG['enable_resshift'], 'S7_osediff_x4': g.CFG['enable_osediff']}
+LR_DIR, HR_DIR = g.W / 'tiles/lr/images/test', g.W / 'tiles/hr/images/test'
 
 
 def py(env_key):
@@ -30,7 +34,7 @@ def official(env_key, args, cwd):
 
 def png_inputs(tmp, lr_dir, ids):
     d = tmp / 'in'
-    d.mkdir(parents=True)
+    d.mkdir()
     for i in ids:
         img = cv2.imread(str(lr_dir / f'{i}.tif'), cv2.IMREAD_COLOR)
         assert img is not None, i
@@ -44,14 +48,19 @@ def realesrgan(tmp, lr_dir, name, model_path):
     return lambda i: tmp / 'out' / f'{i}_out.png'
 
 
-def run_method(m, tmp, lr_dir, hr_dir, ids):
-    """공식 스크립트 실행 → 타일 id별 출력 PNG 경로 함수."""
+def run_method(m, tmp, ids):
+    """tmp에 ids 타일만 링크한 입력 폴더를 만들고 공식 스크립트 실행 → 타일 id별 출력 PNG 경로 함수."""
+    lr_dir, hr_dir = tmp / 'lr', tmp / 'hr'
+    for d, src in ((lr_dir, LR_DIR), (hr_dir, HR_DIR)):
+        d.mkdir(parents=True)
+        for i in ids:
+            (d / f'{i}.tif').symlink_to(src / f'{i}.tif')
     if m == 'S2_swinir_classical_x4':
         # classical_sr는 GT 폴더를 순회하고 LQ를 '<이름>x4<확장자>'로 찾는다(main_test_swinir.py get_image_pair).
         lq = tmp / 'lq'
-        lq.mkdir(parents=True)
+        lq.mkdir()
         for i in ids:
-            (lq / f'{i}x4.tif').symlink_to(lr_dir / f'{i}.tif')
+            (lq / f'{i}x4.tif').symlink_to(LR_DIR / f'{i}.tif')
         official('official_sr', [TP / 'SwinIR/main_test_swinir.py', '--task', 'classical_sr', '--scale', 4,
                                  '--training_patch_size', 64, '--model_path',
                                  WT / 'swinir/001_classicalSR_DF2K_s64w8_SwinIR-M_x4.pth',
@@ -81,7 +90,7 @@ def run_method(m, tmp, lr_dir, hr_dir, ids):
 def main():
     tiles = gpd.read_file(g.W / 'tiles.geojson')
     ids = sorted(tiles[(tiles.split == 'test') & tiles.use].tile_id)
-    lr_dir, hr_dir = g.W / 'tiles/lr/images/test', g.W / 'tiles/hr/images/test'
+    assert len(ids) > 1, 'load-time separation needs at least 2 tiles'
     fp = gpd.read_file(g.W / 'footprint.geojson').geometry.iloc[0]
     hr_fill, _ = g.fills()
     km2 = len(ids) * (g.CFG['tile_lr'] * g.LR) ** 2 / 1e6
@@ -94,12 +103,17 @@ def main():
         shutil.rmtree(tmp, ignore_errors=True)
         tmp.mkdir(parents=True)
         t0 = time.time()
-        out_png = run_method(m, tmp, lr_dir, hr_dir, ids)
-        g.log_sr_time(m, time.time() - t0, km2)
+        out_png = run_method(m, tmp, ids)
+        total = time.time() - t0
+        mt = sorted(out_png(i).stat().st_mtime for i in ids)
+        per_tile = (mt[-1] - mt[0]) / (len(ids) - 1)
+        load = mt[0] - t0 - per_tile
+        assert load > 0 and per_tile > 0, (m, mt[0] - t0, mt[-1] - mt[0])
+        g.log_sr_time(m, len(ids) * per_tile, km2, load, total)
         for i in ids:
             img = cv2.imread(str(out_png(i)), cv2.IMREAD_COLOR)
             assert img is not None, (m, out_png(i))
-            g.save_sr(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), lr_dir / f'{i}.tif', hr_dir / f'{i}.tif',
+            g.save_sr(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), LR_DIR / f'{i}.tif', HR_DIR / f'{i}.tif',
                       g.W / 'sr' / m / 'images/test' / f'{i}.tif', hr_fill, fp)
         shutil.rmtree(tmp)
         print(f'{m}: {len(ids)} tiles saved and checked against the HR grid (G8)')

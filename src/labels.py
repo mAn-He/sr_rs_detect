@@ -52,8 +52,14 @@ def main():
 
 
 def stats(df, bld, tiles):
-    """건물 면적 분포, HR·LR 건물당 픽셀 수 분포, 분할별 건물 수(라벨 인스턴스·고유 건물)."""
+    """건물 면적 분포, HR·LR 건물당 픽셀 수 분포, 분할별 건물 수(라벨 인스턴스·고유 건물),
+    타일당 GT 최대 개수와 max_det(train·val 타일 기준, test 타일이 넘지 않는지 확인)."""
     u = df.drop_duplicates('building_id')
+    per_tile = df.groupby('tile_id').size().reindex(tiles.tile_id, fill_value=0)
+    split_of = tiles.set_index('tile_id').split
+    max_gt = int(per_tile[split_of != 'test'].max())
+    max_det = max(g.CFG['max_det_min'], g.CFG['max_det_factor'] * max_gt)
+    assert per_tile.max() <= max_det, (per_tile.max(), max_det)
     edges = [0, *g.CFG['area_bins'], np.inf]
     q = [0.05, 0.25, 0.5, 0.75, 0.95]
     out = {
@@ -64,6 +70,7 @@ def stats(df, bld, tiles):
         'per_split': {s: {'tiles': int((tiles.split == s).sum()), 'label_instances': int((df.split == s).sum()),
                           'unique_buildings': int(u[u.split == s].shape[0])} for s in g.SPLITS},
         'buildings_in_used_blocks_total': len(u), 'buildings_all': len(bld),
+        'max_gt_per_tile': {s: int(per_tile[split_of == s].max()) for s in g.SPLITS}, 'max_det': max_det,
     }
     (g.W / 'label_stats.json').write_text(json.dumps(out, indent=1, default=str))
     print(json.dumps(out, indent=1, default=str))

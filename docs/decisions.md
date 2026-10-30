@@ -21,7 +21,7 @@
 - 결과가 지지했는가:
 
 ## 학습 예산
-- 선택: YOLO epochs=100(공식 기본값), patience=20, batch=0.80(공식 AutoBatch, GPU 메모리 80%), workers=8, D_HR·D_LR 각각 3시간 상한. S6은 공식 paired data 파인튜닝 설정에서 출발해 3시간 이내로 반복 횟수를 줄인다. 실제 배치 값과 S6 반복 횟수는 Stage 4/5 측정 후 이 항목에 추가한다.
+- 선택: YOLO epochs=100(공식 기본값), patience=20, batch=0.80(공식 AutoBatch, GPU 메모리 80%), workers=8, D_HR·D_LR 각각 3시간 상한. S6은 공식 paired data 파인튜닝 설정(total_iter 400k, milestones [400k])에서 출발해 3시간 이내로 반복 횟수를 줄인다: 본 실행 데이터로 300회를 돌려 로그 시각으로 반복당 시간을 재고, 3시간 × 0.9(체크포인트 저장·로더 변동 여유) 안에 끝나는 반복 수(100 단위 내림)로 정한다. milestones는 400k 대비 같은 비율로 줄인다(공식 설정이 milestone = total_iter라 줄인 뒤에도 마지막 반복에만 걸린다). 추론에는 마지막 체크포인트를 쓰고, 학습 후 가중치가 바뀌었는지 assert한다(사용자 결정 2026-10-30). 실제 배치 값과 S6 반복 횟수는 results/det_D_*.json, data/full/s6_finetune.json에 남기고 Stage 7에서 이 항목에 적는다.
 - 대안: 공식 기본 patience=100(에폭 100과 같아 조기 종료가 사실상 없음), OOM 지점을 직접 찾아 80%를 곱하는 방식
 - 이유: RTX 4090 1장에서 전체 실험 시간을 제한한다. batch=0.80은 "메모리 부족이 나지 않는 최대값의 약 80%"를 공식 옵션으로 구현한 것이다(의미가 완전히 같지는 않다: 배치 최대값이 아니라 메모리 사용률 80%를 목표로 한다).
 - 결과가 지지했는가:
@@ -124,14 +124,30 @@
 - G5 판정 예외: 0.5 LR px를 넘는 train 블록은 제외하지 않고 경고로 유지, val·test 블록이 넘으면 멈춘다(사용자 결정, val은 test와 같이 취급).
 - 결과가 지지했는가:
 
-## 평가 세부 정의 (Stage 3~6 구현 시 정함, 2026-10-29, 사용자 확인 필요)
+## 평가 세부 정의 (2026-10-29 제안, 2026-10-30 사용자 결정 반영)
+- 원칙(사용자 결정): 운영 conf와 타일 병합 IoU는 val 블록에서 D_HR로 정해 모든 방법에 고정한다. test로 정하지 않는다.
 - 선택:
-  - AP용 예측은 conf ≥ 0.001(Ultralytics val 기본값), 거짓 양성 수와 면적 구간별 재현율은 운영점 conf ≥ 0.25(Ultralytics predict 기본값).
-  - AP50은 Ultralytics compute_ap과 같은 101점 보간, 매칭은 conf 내림차순 탐욕, UTM에서 예측 OBB와 GT 폴리곤의 최소 회전 사각형(cv2.minAreaRect) 사이 회전 IoU ≥ 0.5.
-  - 타일 병합 NMS(cv2.dnn.NMSBoxesRotated)는 IoU 0.7(Ultralytics 기본값)이며 블록마다 따로 한다(타일은 블록 안에서만 겹친다).
+  - AP용 예측은 conf ≥ 0.001(Ultralytics val 기본값).
+  - 운영 conf(거짓 양성 수, 면적 구간별 재현율): D_HR은 HR val, D_LR은 LR val에서 F1 최대 conf. 계산은 Ultralytics ap_per_class와 같다(1000점 conf 격자, F1 곡선 0.1 평활 후 최대). 지리 평가와 같은 조건(병합 후, 평가 영역·M4 제외, 제외 폭 8 LR px)에서 구한다. SR 행(D_HR on SR)은 D_HR 값을 쓴다.
+  - 타일 병합 NMS(cv2.dnn.NMSBoxesRotated, 블록마다): HR val에서 IoU 0.5와 0.7을 비교한다. 비교 값은 AP50과 중복 쌍 비율(운영 conf 이상 병합 예측끼리 회전 IoU > 0.3인 쌍의 수 ÷ 예측 수). 규칙: AP50 차가 0.005 이내면 중복 쌍 비율이 낮은 쪽, 아니면 AP50이 높은 쪽(사용자 지시 "나은 쪽"을 실행 규칙으로 정한 것). D_LR의 운영 conf는 고른 IoU로 병합한 뒤 구한다.
+  - max_det: train·val 타일당 GT 최대 개수 × 3과 1000 중 큰 값. 학습 val과 추론에 같은 값을 쓰고, test 타일 GT 최대 개수가 이 값을 넘지 않는지 assert한다. 스모크에서 기본값 300이 타일마다 꽉 차 상한에 걸렸기 때문이다.
+  - AP50은 Ultralytics compute_ap과 같은 101점 보간(사용자 승인). 매칭은 conf 내림차순 탐욕, UTM에서 예측 OBB와 GT 폴리곤의 최소 회전 사각형(cv2.minAreaRect) 사이 회전 IoU ≥ 0.5(사용자 승인).
   - 부트스트랩은 test 블록 복원추출. GT·예측은 중심점이 든 test 블록에 속하며, 같은 표본으로 방법과 경로 1의 차이(gain)를 계산한다.
-- 대안: 재현율을 conf 0.001에서 계산(최대 재현율이라 낮은 conf 예측으로 부풀려짐), 전역 NMS(full에서 수만 개 예측의 O(n²))
-- 이유: CLAUDE.md가 conf·NMS 값을 정하지 않아 Ultralytics 공식 기본값을 따랐다.
+  - 평가 영역은 footprint 안쪽 제외 폭 ∩ 분할 블록 ∩ 사용 타일. test는 모든 타일을 쓰므로 블록과 같고, val은 유효 25% 미만 타일이 없어 그 영역을 뺀다.
+- 대안: Ultralytics 기본값(conf 0.25, NMS IoU 0.7, max_det 300) 그대로, 타일 단위 Ultralytics val의 F1 최대 conf, 전역 NMS
+- 이유: 기본값은 이 데이터에 맞춘 값이 아니고, test에서 정하면 test 결과가 낙관적으로 치우친다. 타일 단위가 아니라 병합 후 지리 평가 조건에서 정해야 test 평가와 같은 조건이다.
+- 결과가 지지했는가: 정한 값은 results/det_calibration.json
+
+## 탐지기 재현성 설정
+- 선택: Ultralytics cache='disk'(디코딩한 .npy를 /root/tiles_cache에 저장, 학습 후 타일과 함께 삭제), seed=0, deterministic=True(공식 옵션, 기본값과 같으나 명시). 사용 값은 results/det_D_*.json의 args에 남긴다.
+- 대안: cache='ram'(스모크에서 사용, Ultralytics가 비결정성 경고), cache 없음
+- 이유: 사용자 결정. RAM 캐시는 재현성 경고가 있고, 디스크 캐시는 /root(컨테이너 디스크)라 디코딩 부담을 줄이면서 결정적이다.
+- 결과가 지지했는가:
+
+## 처리 시간 지표
+- 선택: sr_sec_per_km2, det_sec_per_km2는 모델 로딩·예열을 뺀 시간이고, 로딩·예열 시간은 sr_load_sec, det_load_sec 열에 따로 둔다. 탐지는 모델 로딩 + 타일 1장 예열을 따로 잰다. 공식 SR 스크립트는 내부를 고치지 않고, 스크립트가 순서대로 쓰는 출력 파일의 수정 시각으로 나눈다: 타일당 시간 = (마지막 − 첫 출력 시각)/(n − 1), 로딩 = (첫 출력 시각 − 시작) − 타일당 시간, 처리 = n × 타일당 시간. 두 번 실행해 차를 내는 방식은 로딩 시간이 실행마다 ±30 s 흔들려 버렸다(autofix 14). 보간 S0·S1은 모델이 없어 로딩 시간이 없다(NaN).
+- 대안: 공식 스크립트에 시간 측정 코드 추가(공식 코드 수정), 타일 1장·n장 두 번 실행의 차, 로딩 포함 시간만 보고
+- 이유: 사용자 결정. 타일 수가 적으면 로딩 시간이 처리 시간을 덮는다(스모크 OSEDiff 4타일 102 s의 대부분).
 - 결과가 지지했는가:
 
 ## SR 출력 채움값과 S0·S1 입력

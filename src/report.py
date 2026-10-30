@@ -27,7 +27,7 @@ def summary():
     srt = pd.read_csv(g.W / 'sr_timing.csv').set_index('method')
     det = pd.read_csv(g.W / 'det_timing.csv').set_index('method')
     out = []
-    for name, *_ in rows():
+    for name, *_ in rows('test'):
         cat = {'HR': 'upper_bound', 'LR': 'lower_bound'}.get(name, g.CFG['sr_methods'].get(name))
         path = {'HR': 'HR (D_HR on HR)', 'LR': 'path1 (D_LR on LR)'}.get(name, 'path2 (D_HR on SR)')
         r = {'method': name, 'category': cat, 'path': path}
@@ -41,8 +41,12 @@ def summary():
         for k in ('gain', 'gain_ci_low', 'gain_ci_high', 'recovery', 'verdict'):
             r[k] = e.get(k, np.nan)
         r['false_positives'] = e.false_positives
+        # 처리 시간은 모델 로딩·예열을 뺀 값, 로딩·예열 시간은 별도 열(보간 S0·S1은 모델이 없어 비어 있다)
         r['sr_sec_per_km2'] = srt.at[name, 'seconds'] / srt.at[name, 'km2'] if name in srt.index else np.nan
         r['det_sec_per_km2'] = det.at[name, 'seconds'] / det.at[name, 'km2']
+        r['sr_load_sec'] = srt.at[name, 'load_sec'] if name in srt.index else np.nan
+        r['det_load_sec'] = det.at[name, 'load_sec']
+        r['conf_op'] = e.conf_op
         for b in BINS:
             for k in (f'gain_recall_{b}', f'gain_recall_{b}_ci_low', f'gain_recall_{b}_ci_high'):
                 r[k] = e.get(k, np.nan)
@@ -100,7 +104,8 @@ def recall_bars(df):
         ax.bar(x + (k - (len(BINS) - 1) / 2) * w, v, w * 0.92, color=SERIES[k], label=f'{b} m²',
                yerr=[v - df[f'recall_{b}_ci_low'], df[f'recall_{b}_ci_high'] - v], ecolor=MUTED, error_kw={'lw': 0.8})
     ax.set_xticks(x, [m.split('_')[0] for m in df.method])
-    ax.set_ylabel(f"recall at conf {g.CFG['det_conf_op']} (95% CI)")
+    c = df.set_index('method').conf_op
+    ax.set_ylabel(f"recall at operating conf (95% CI)\nD_HR {c['HR']:.3f}, D_LR {c['LR']:.3f} (val F1 max)")
     ax.legend(frameon=False, ncol=len(BINS), loc='upper left', bbox_to_anchor=(0, 1.12))
     ax.grid(axis='y', color='#e6e5e0', lw=0.6)
     fig.savefig(g.FIG / 'report_b_recall_by_area.png', dpi=130)
@@ -122,7 +127,7 @@ def scenes(df):
     x0, y0, x1, y1 = t.geometry.bounds
     cx, cy = g.LR * round((x0 + x1) / 2 / g.LR), g.LR * round((y0 + y1) / 2 / g.LR)
     geom = gpd.GeoSeries.from_xy([cx], [cy]).buffer(38.4, cap_style='square').iloc[0]  # 76.8 m = HR 256 px
-    names = [r[0] for r in rows()]
+    names = [r[0] for r in rows('test')]
     imgs = []
     for n in names:
         kind = {'HR': 'tiles/hr', 'LR': 'tiles/lr'}.get(n, f'sr/{n}')
@@ -148,7 +153,7 @@ def scenes(df):
     gt = bld[bld.intersects(region)]
     gt = gt[inside(gt.geometry, region)]
     gt_obb = np.array([obb(x) for x in gt.geometry])
-    p = gpd.read_file(g.W / 'preds' / f'{m}.geojson').to_crs(g.UTM)
+    p = gpd.read_file(g.W / 'preds/test' / f'{m}.geojson').to_crs(g.UTM)
     p = p[inside(p.geometry, region)].reset_index(drop=True)
     tp, _ = match(p, gt_obb)
     fps = p[~tp].sort_values('conf', ascending=False)
@@ -183,7 +188,7 @@ def main():
     scatter(df, 'PSNR', 'report_a_psnr_vs_ap50.png', 'PSNR (dB, evaluation mask)')
     recall_bars(df)
     scenes(df)
-    scatter(df, 'sr_sec_per_km2', 'report_e_time_vs_ap50.png', 'SR time (s per km², incl. model load)', logx=True)
+    scatter(df, 'sr_sec_per_km2', 'report_e_time_vs_ap50.png', 'SR time (s per km², excl. model load)', logx=True)
     scatter(df, 'sharpness_ratio', 'report_f_sharpness_vs_ap50.png', 'sharpness_ratio (Laplacian var SR/HR)')
 
 
