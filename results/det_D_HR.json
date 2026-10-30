@@ -2,23 +2,23 @@
  "name": "D_HR",
  "imgsz": 1024,
  "batch_actual": 14,
- "epochs_run": 87,
+ "epochs_run": 86,
  "best": "/workspace/rs-sr-detect/runs/full/D_HR/weights/best.pt",
  "n_train_images": 433,
  "args": {
   "seed": 0,
   "deterministic": true,
   "cache": "disk",
-  "max_det": 1000,
+  "max_det": 3000,
   "workers": 8,
-  "epochs": 100,
+  "epochs": 200,
   "patience": 20
  },
  "val_metrics": {
-  "metrics/precision(B)": 0.8911361929741598,
-  "metrics/recall(B)": 0.7991403892899056,
-  "metrics/mAP50(B)": 0.8688188825445272,
-  "metrics/mAP50-95(B)": 0.6678612617494096
+  "metrics/precision(B)": 0.893777479050564,
+  "metrics/recall(B)": 0.7962778081511591,
+  "metrics/mAP50(B)": 0.8701869809121372,
+  "metrics/mAP50-95(B)": 0.6679945771453297
  },
  "gpu": "NVIDIA GeForce RTX 4090"
 }

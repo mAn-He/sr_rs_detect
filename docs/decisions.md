@@ -142,7 +142,7 @@
 - 선택: Ultralytics cache='disk'(디코딩한 .npy를 /root/tiles_cache에 저장, 학습 후 타일과 함께 삭제), seed=0, deterministic=True(공식 옵션, 기본값과 같으나 명시). 사용 값은 results/det_D_*.json의 args에 남긴다.
 - 대안: cache='ram'(스모크에서 사용, Ultralytics가 비결정성 경고), cache 없음
 - 이유: 사용자 결정. RAM 캐시는 재현성 경고가 있고, 디스크 캐시는 /root(컨테이너 디스크)라 디코딩 부담을 줄이면서 결정적이다.
-- 결과가 지지했는가:
+- 결과가 지지했는가: 지지. 같은 설정으로 따로 학습한 D_LR_e200(민감도)과 D_LR(epochs 200 재학습)의 results.csv가 200에폭 전부에서 에폭 시간 열을 빼고 모두 같다(runs/full/D_LR_e200, runs/full/D_LR).
 
 ## 처리 시간 지표
 - 선택: sr_sec_per_km2, det_sec_per_km2는 모델 로딩·예열을 뺀 시간이고, 로딩·예열 시간은 sr_load_sec, det_load_sec 열에 따로 둔다. 탐지는 모델 로딩 + 타일 1장 예열을 따로 잰다. 공식 SR 스크립트는 내부를 고치지 않고, 스크립트가 순서대로 쓰는 출력 파일의 수정 시각으로 나눈다: 타일당 시간 = (마지막 − 첫 출력 시각)/(n − 1), 로딩 = (첫 출력 시각 − 시작) − 타일당 시간, 처리 = n × 타일당 시간. 두 번 실행해 차를 내는 방식은 로딩 시간이 실행마다 ±30 s 흔들려 버렸다(autofix 14). 보간 S0·S1은 모델이 없어 로딩 시간이 없다(NaN).
