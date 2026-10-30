@@ -179,6 +179,7 @@ def tables(names, res, n_gt, conf_op):
             r[f'recall_{b}'] = full[n][f'recall_{b}']
             r[f'recall_{b}_ci_low'], r[f'recall_{b}_ci_high'] = ci(bs[n][f'recall_{b}'])
         r['false_positives'], r['n_pred_op'] = full[n]['false_positives'], full[n]['n_pred_op']
+        r['fp_ratio'] = r['false_positives'] / r['n_pred_op']  # 운영 conf 이상 예측 중 거짓 양성 비율
         t3.append(r)
     t3 = pd.DataFrame(t3)
     t3.to_csv(OUT / 'area_recall_fp.csv', index=False)

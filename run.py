@@ -35,6 +35,8 @@ STAGES = {
     'report_viewer': [('py', 'src/report_viewer.py')],
     'eval': [('py', 'src/det_infer.py', 'test'), ('py', 'src/merge.py', 'test'), ('py', 'src/geo_eval.py', 'test'),
              ('py', 'src/report.py')],
+    # README.md·README.ko.md 결과표 갱신과 수치·링크 대조 → docs/code_check.md
+    'report': [('py', 'src/report.py', 'readme')],
 }
 
 

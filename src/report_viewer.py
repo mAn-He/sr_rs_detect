@@ -52,6 +52,10 @@ def short(m):
     return m if m in ('HR', 'LR') or m in POSTHOC else m.split('_')[0]
 
 
+# 산점도 라벨 오프셋(점): S5·S7은 LPIPS와 AP50이 거의 같아 S5 라벨을 점 아래에 둔다.
+LABEL_XY = {'S5': (5, -12)}
+
+
 def image(m, tid):
     """HR 격자(1024) RGB. LR은 최근접 4배."""
     if m == 'LR':
@@ -249,7 +253,8 @@ def charts():
         ax.errorbar(sr[k], sr.AP50_geo, yerr=[sr.AP50_geo - sr.AP50_ci_low, sr.AP50_ci_high - sr.AP50_geo], fmt='o',
                     color='#2b6cb0', capsize=3)
         for r in sr.itertuples():
-            ax.annotate(short(r.method), (getattr(r, k), r.AP50_geo), textcoords='offset points', xytext=(5, 4), fontsize=9)
+            ax.annotate(short(r.method), (getattr(r, k), r.AP50_geo), textcoords='offset points',
+                        xytext=LABEL_XY.get(short(r.method), (5, 4)), fontsize=9)
         for m, ls in (('HR', '--'), ('LR', ':')):
             ax.axhline(s.set_index('method').loc[m, 'AP50_geo'], color='#555', ls=ls, lw=1, label=f'{m} AP50')
         ax.set_xlabel(f'{k} (evaluation mask){" — lower is better" if sign < 0 else ""}')
@@ -295,7 +300,9 @@ def overview_html(chart_src, rho):
     s = pd.read_csv(g.ROOT / 'results/summary.csv')
     s0 = pd.read_csv(POST / 'gain_vs_S0.csv').set_index('method') if (POST / 'gain_vs_S0.csv').exists() else None
     head = ['method', 'category', 'AP50_geo [CI]', 'gain vs LR [CI]'] + (['gain vs S0 [CI] (사후)'] if s0 is not None else []) \
-        + ['recovery', 'verdict', 'PSNR', 'SSIM', 'LPIPS', 'FP']
+        + ['recovery', 'verdict', 'PSNR', 'SSIM', 'LPIPS', 'FP', '예측 수 (운영 conf 이상)', 'FP 비율']
+    ge = pd.read_csv(g.ROOT / 'results/geo_eval.csv')
+    n_op = ge[ge.buffer_lr == g.CFG['eval_buffer_lr']].set_index('method').n_pred_op
     body = []
     for r in s.itertuples():
         sr = r.path.startswith('path2')
@@ -306,10 +313,10 @@ def overview_html(chart_src, rho):
                                 s0.loc[r.method, 'diff_ci_high']) if r.method in s0.index else '–')
         cells += [f'{r.recovery:.2f}' if sr else '–',
                   f'<span class="badge {r.verdict}">{r.verdict}</span>' if sr else '–',
-                  *(f'{getattr(r, k):.3f}' if sr else '–' for k in ('PSNR', 'SSIM', 'LPIPS')), str(int(r.false_positives))]
+                  *(f'{getattr(r, k):.3f}' if sr else '–' for k in ('PSNR', 'SSIM', 'LPIPS')), str(int(r.false_positives)),
+                  str(int(n_op[r.method])), f'{r.false_positives / n_op[r.method]:.3f}']
         body.append('<tr>' + ''.join(f'<td>{c}</td>' for c in cells) + '</tr>')
     tbl = f'<table class="t"><tr>{"".join(f"<th>{h}</th>" for h in head)}</tr>{"".join(body)}</table>'
-    ge = pd.read_csv(g.ROOT / 'results/geo_eval.csv')
     bufs = sorted(ge.buffer_lr.unique())
     sens = ['<tr><th>method</th>' + ''.join(f'<th>{b} LR px: AP50 / gain / verdict</th>' for b in bufs) + '</tr>']
     for m in ge.method.unique():
