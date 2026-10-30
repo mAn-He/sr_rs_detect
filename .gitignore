@@ -26,3 +26,5 @@ __pycache__/
 *.pyc
 .ruff_cache/
 .pytest_cache/
+results/report/full/
+results/report/highlights.html

@@ -25,4 +25,8 @@ test를 다시 돌리면 아래 '재실행 기록'에 날짜, 이유, 바뀐 값
 | Canny 임계값 | low 47 / high 94 (HR train 밝기 중앙값 71 × 0.66 / 1.33) | results/canny_thresholds.json |
 
 ## 재실행 기록
-(없음)
+- 2026-10-30, **사후 분석, 주 결론 아님** (src/posthoc.py, run.py posthoc, 결과 results/posthoc/). 사용자 지시로 test를 다시 사용했다.
+  위 고정 값을 하나도 바꾸지 않았다(D_HR SHA256을 스크립트에서 assert, 제외 폭은 주 값 8 LR px만, 부트스트랩은 geo_eval.py와 같은 seed·같은 표본이며
+  기존 행 AP50과 CI가 results/geo_eval.csv와 같은지 assert). 새로 탐지한 행은 색 보정 대조군 S0_color, S3_color뿐이다
+  (train 블록 MS–PS 쌍에서 학습한 밴드별 선형 변환을 S0·S3 출력에 적용). 내용: S0 대비 이득, 색 보정 대조군, 면적 구간별 재현율·거짓 양성,
+  S6 제외 Spearman, 정성 그림. summary.csv와 주 결론은 바꾸지 않는다.

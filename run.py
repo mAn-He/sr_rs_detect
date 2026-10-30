@@ -29,6 +29,10 @@ STAGES = {
             'S5_resshift_v3_x4', 'S7_osediff_x4'),
            ('py', 'src/sr_finetune.py'), ('py', 'src/sr_run.py', 'S6_realesrgan_ft_spacenet'),
            ('py', 'src/sr_metrics.py')],
+    # 사후 분석(주 결론 아님, docs/frozen_eval.md 재실행 기록) → results/posthoc/
+    'posthoc': [('py', 'src/posthoc.py')],
+    # 결과 리포트 뷰어(기존 결과물만 읽음) → results/report/
+    'report_viewer': [('py', 'src/report_viewer.py')],
     'eval': [('py', 'src/det_infer.py', 'test'), ('py', 'src/merge.py', 'test'), ('py', 'src/geo_eval.py', 'test'),
              ('py', 'src/report.py')],
 }

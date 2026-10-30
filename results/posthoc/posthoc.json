@@ -1,0 +1,18 @@
+{
+ "note": "post-hoc analysis, not a main result (docs/frozen_eval.md)",
+ "buffer_lr": 8,
+ "n_gt": 4426,
+ "bootstrap": 1000,
+ "seed": 0,
+ "D_HR_sha256": "03b14b45c153797e84a891cf1169e0b5e4107c9893438ca396f0f230fd44c613",
+ "max_det": 3000,
+ "nms_iou": 0.5,
+ "conf_op": {
+  "D_HR": 0.5025025025025025,
+  "D_LR": 0.5615615615615616
+ },
+ "figures": [
+  "results/figures/qualitative_b028_r1c0.png",
+  "results/figures/qualitative_b132_r0c0.png"
+ ]
+}
