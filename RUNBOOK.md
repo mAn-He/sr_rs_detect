@@ -52,4 +52,7 @@ T=$(date +%Y%m%d_%H%M%S); nohup bash -c "set -e; PROJ_DATA=/workspace/miniforge3
 # D_LR 민감도 판정(+0.0124 ≥ 0.01)에 따라 epochs 200으로 재학습(100에폭 결과는 runs/full/D_*_e100으로 mv). 민감도 코드는 커밋 da7fe24.
 mv runs/full/D_HR runs/full/D_HR_e100 && mv runs/full/D_LR runs/full/D_LR_e100
 T=$(date +%Y%m%d_%H%M%S); nohup $P run.py train_det det_calib sr > logs/full_e200_sr_$T.log 2>&1 &
+# SR 단계 후 test 평가 직전 docs/frozen_eval.md 기록·커밋, 그다음 test 평가
+cp data/full/s6_finetune.json results/s6_finetune.json
+T=$(date +%Y%m%d_%H%M%S); nohup $P run.py eval > logs/full_eval_$T.log 2>&1 &
 ```
