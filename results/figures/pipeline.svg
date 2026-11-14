@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 666" width="1200" height="666" font-family="Inter, Helvetica, Arial, sans-serif">
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#6B7280"/></marker><marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2F5D9E"/></marker></defs>
+<rect width="1200" height="666" fill="#FFFFFF"/>
+<rect x="20" y="16" width="1160" height="140" rx="6" fill="#EEF6F5"/>
+<rect x="20" y="16" width="5" height="140" rx="2" fill="#2C7A73"/>
+<text x="38" y="40" font-size="14" font-weight="700" fill="#2C7A73" text-anchor="start">Stage 1</text>
+<text x="106" y="40" font-size="14" font-weight="700" fill="#111827" text-anchor="start">Data preparation</text>
+<rect x="40" y="52" width="256" height="88" rx="5" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="1"/>
+<text x="168.0" y="83.0" font-size="15" font-weight="600" fill="#111827" text-anchor="middle">WorldView-3 bands</text>
+<text x="168.0" y="104.0" font-size="13" font-weight="400" fill="#4B5563" text-anchor="middle">PAN 0.3 m (1 band)</text>
+<text x="168.0" y="122.0" font-size="13" font-weight="400" fill="#4B5563" text-anchor="middle">multispectral 1.2 m (8 bands)</text>
+<rect x="328" y="52" width="256" height="88" rx="5" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="1"/>
+<text x="456.0" y="83.0" font-size="15" font-weight="600" fill="#111827" text-anchor="middle">SpaceNet 2 products</text>
+<text x="456.0" y="104.0" font-size="13" font-weight="400" fill="#4B5563" text-anchor="middle">LR: multispectral RGB, 1.2 m</text>
+<text x="456.0" y="122.0" font-size="13" font-weight="400" fill="#4B5563" text-anchor="middle">HR: pan-sharpened RGB, 0.3 m</text>
+<rect x="616" y="52" width="256" height="88" rx="5" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="1"/>
+<text x="744.0" y="83.0" font-size="15" font-weight="600" fill="#111827" text-anchor="middle">Co-registration</text>
+<text x="744.0" y="104.0" font-size="13" font-weight="400" fill="#4B5563" text-anchor="middle">common UTM grid (GDAL)</text>
+<text x="744.0" y="122.0" font-size="13" font-weight="400" fill="#4B5563" text-anchor="middle">1 LR pixel = 4 × 4 HR pixels</text>
+<rect x="904" y="52" width="256" height="88" rx="5" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="1"/>
+<text x="1032.0" y="83.0" font-size="15" font-weight="600" fill="#111827" text-anchor="middle">Spatial split</text>
+<text x="1032.0" y="104.0" font-size="13" font-weight="400" fill="#4B5563" text-anchor="middle">576 m blocks</text>
+<text x="1032.0" y="122.0" font-size="13" font-weight="400" fill="#4B5563" text-anchor="middle">train / val / test</text>
+<path d="M299 96.0H323" fill="none" stroke="#6B7280" stroke-width="1.2" marker-end="url(#arr)"/>
+<path d="M587 96.0H611" fill="none" stroke="#6B7280" stroke-width="1.2" marker-end="url(#arr)"/>
+<path d="M875 96.0H899" fill="none" stroke="#6B7280" stroke-width="1.2" marker-end="url(#arr)"/>
+<rect x="20" y="172" width="1160" height="300" rx="6" fill="#EFF3FA"/>
+<rect x="20" y="172" width="5" height="300" rx="2" fill="#2F5D9E"/>
+<text x="38" y="196" font-size="14" font-weight="700" fill="#2F5D9E" text-anchor="start">Stage 2</text>
+<text x="106" y="196" font-size="14" font-weight="700" fill="#111827" text-anchor="start">Detection</text>
+<rect x="64" y="214.0" width="180" height="152" rx="5" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="1"/>
+<text x="154.0" y="295.0" font-size="15" font-weight="600" fill="#111827" text-anchor="middle">LR image</text>
+<rect x="64" y="402.0" width="180" height="56" rx="5" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="1"/>
+<text x="154.0" y="435.0" font-size="15" font-weight="600" fill="#111827" text-anchor="middle">HR image</text>
+<rect x="760" y="214.0" width="222" height="56" rx="5" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="1"/>
+<text x="871.0" y="247.0" font-size="15" font-weight="600" fill="#111827" text-anchor="middle">Detector trained on LR</text>
+<rect x="760" y="310.0" width="222" height="148" rx="5" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="1"/>
+<text x="871.0" y="389.0" font-size="15" font-weight="600" fill="#111827" text-anchor="middle">Detector trained on HR</text>
+<rect x="292" y="272" width="420" height="132" rx="5" fill="#FFFFFF" stroke="#2F5D9E" stroke-width="1.4"/>
+<text x="308" y="298" font-size="15" font-weight="600" fill="#111827" text-anchor="start">Super-resolution (8 models)</text>
+<text x="308" y="321" font-size="13" font-weight="600" fill="#111827" text-anchor="start">Interpolation</text>
+<text x="428" y="321" font-size="13" font-weight="400" fill="#4B5563" text-anchor="start">Bicubic, Lanczos</text>
+<text x="308" y="339" font-size="13" font-weight="600" fill="#111827" text-anchor="start">Regression</text>
+<text x="428" y="339" font-size="13" font-weight="400" fill="#4B5563" text-anchor="start">SwinIR, Real-ESRNet</text>
+<text x="308" y="357" font-size="13" font-weight="600" fill="#111827" text-anchor="start">GAN</text>
+<text x="428" y="357" font-size="13" font-weight="400" fill="#4B5563" text-anchor="start">Real-ESRGAN</text>
+<text x="308" y="375" font-size="13" font-weight="600" fill="#111827" text-anchor="start">Diffusion</text>
+<text x="428" y="375" font-size="13" font-weight="400" fill="#4B5563" text-anchor="start">ResShift, OSEDiff</text>
+<rect x="300" y="380" width="404" height="19" rx="3" fill="#E6EDF7"/>
+<text x="308" y="393" font-size="13" font-weight="600" fill="#2F5D9E" text-anchor="start">Fine-tuned GAN</text>
+<text x="428" y="393" font-size="13" font-weight="600" fill="#2F5D9E" text-anchor="start">Real-ESRGAN, tuned on our image pairs</text>
+<rect x="1022" y="224" width="136" height="36" rx="18" fill="#FFFFFF" stroke="#9CA3AF"/>
+<text x="1090.0" y="247" font-size="14" font-weight="600" fill="#111827" text-anchor="middle">Baseline</text>
+<rect x="1022" y="320" width="136" height="36" rx="18" fill="#E6EDF7" stroke="#2F5D9E"/>
+<text x="1090.0" y="343" font-size="14" font-weight="600" fill="#2F5D9E" text-anchor="middle">SR + detection</text>
+<rect x="1022" y="412" width="136" height="36" rx="18" fill="#FFFFFF" stroke="#9CA3AF"/>
+<text x="1090.0" y="435" font-size="14" font-weight="600" fill="#111827" text-anchor="middle">Upper bound</text>
+<path d="M246 242H755" fill="none" stroke="#6B7280" stroke-width="1.2" marker-end="url(#arr)"/>
+<path d="M246 338H287" fill="none" stroke="#2F5D9E" stroke-width="1.4" marker-end="url(#arrA)"/>
+<path d="M714 338H755" fill="none" stroke="#2F5D9E" stroke-width="1.4" marker-end="url(#arrA)"/>
+<path d="M246 430H755" fill="none" stroke="#6B7280" stroke-width="1.2" marker-end="url(#arr)"/>
+<path d="M984 242H1017" fill="none" stroke="#6B7280" stroke-width="1.2" marker-end="url(#arr)"/>
+<path d="M984 338H1017" fill="none" stroke="#2F5D9E" stroke-width="1.4" marker-end="url(#arrA)"/>
+<path d="M984 430H1017" fill="none" stroke="#6B7280" stroke-width="1.2" marker-end="url(#arr)"/>
+<path d="M1032.0 140V208H44V430" fill="none" stroke="#9CA3AF" stroke-width="1.2"/>
+<path d="M44 290.0H59" fill="none" stroke="#6B7280" stroke-width="1.2" marker-end="url(#arr)"/>
+<path d="M44 430H59" fill="none" stroke="#6B7280" stroke-width="1.2" marker-end="url(#arr)"/>
+<rect x="20" y="488" width="1160" height="162" rx="6" fill="#F8F3EA"/>
+<rect x="20" y="488" width="5" height="162" rx="2" fill="#9A6B2F"/>
+<text x="38" y="512" font-size="14" font-weight="700" fill="#9A6B2F" text-anchor="start">Stage 3</text>
+<text x="106" y="512" font-size="14" font-weight="700" fill="#111827" text-anchor="start">Evaluation</text>
+<path d="M1160 242H1170V480H332" fill="none" stroke="#9CA3AF" stroke-width="1.2"/>
+<path d="M1160 338H1170" fill="none" stroke="#9CA3AF" stroke-width="1.2"/>
+<path d="M1160 430H1170" fill="none" stroke="#9CA3AF" stroke-width="1.2"/>
+<path d="M332 480V523" fill="none" stroke="#6B7280" stroke-width="1.2" marker-end="url(#arr)"/>
+<rect x="40" y="528" width="352" height="96" rx="5" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="1"/>
+<text x="216.0" y="572.0" font-size="15" font-weight="600" fill="#111827" text-anchor="middle">Map-space merging</text>
+<text x="216.0" y="593.0" font-size="13" font-weight="400" fill="#4B5563" text-anchor="middle">tile detections → building polygons</text>
+<rect x="424" y="528" width="352" height="96" rx="5" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="1"/>
+<text x="600.0" y="563.0" font-size="15" font-weight="600" fill="#111827" text-anchor="middle">Accuracy</text>
+<text x="600.0" y="584.0" font-size="13" font-weight="400" fill="#4B5563" text-anchor="middle">AP50</text>
+<text x="600.0" y="602.0" font-size="13" font-weight="400" fill="#4B5563" text-anchor="middle">recall by building size</text>
+<rect x="808" y="528" width="352" height="96" rx="5" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="1"/>
+<text x="984.0" y="563.0" font-size="15" font-weight="600" fill="#111827" text-anchor="middle">Gain vs. baseline</text>
+<text x="984.0" y="584.0" font-size="13" font-weight="400" fill="#4B5563" text-anchor="middle">AP50 difference with 95% CI</text>
+<text x="984.0" y="602.0" font-size="13" font-weight="400" fill="#4B5563" text-anchor="middle">(spatial block bootstrap)</text>
+<path d="M395 576.0H419" fill="none" stroke="#6B7280" stroke-width="1.2" marker-end="url(#arr)"/>
+<path d="M779 576.0H803" fill="none" stroke="#6B7280" stroke-width="1.2" marker-end="url(#arr)"/>
+</svg>

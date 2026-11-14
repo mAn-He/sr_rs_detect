@@ -4,12 +4,13 @@ Korean: [README.ko.md](README.ko.md)
 
 **Short answer: only when the SR model is fine-tuned on real sensor pairs.** Eight super-resolution (SR) methods were applied to real 1.2 m WorldView-3 multispectral imagery and judged by building-detection accuracy, not by PSNR. With a detector trained on HR and kept fixed, Real-ESRGAN fine-tuned on SpaceNet MS–PS pairs was the only method that beat detecting on the low-resolution input directly. Every public SR model, including both diffusion models, was harmful or inconclusive.
 
+![rs-sr-detect pipeline](results/figures/pipeline.png)
+
+*Figure 1. Pipeline. Stage 1: a WorldView-3 multispectral image (LR) and the pan-sharpened image of the same acquisition (HR) are co-registered on one UTM grid and split by spatial blocks. Stage 2: the same LR image goes straight to a detector trained on LR (baseline) or through one of 8 super-resolution models to a detector trained on HR, which also runs on the real HR image (upper bound). Stage 3: detections are merged into building polygons and each SR model is compared with the baseline by its AP50 gain and a block-bootstrap 95% CI.*
+
 This repository is a proxy experiment for one situation: only 1.2 m-class imagery without a panchromatic band is available (another satellite, or a product delivered without PAN), and it has to be brought to 0.3 m. SpaceNet 2 (AOI_2_Vegas) provides both products from the same WorldView-3 acquisition. The real 1.2 m multispectral (MS) GeoTIFF is the low-resolution (LR) input, and the 0.3 m pan-sharpened RGB (PS-RGB) is the high-resolution (HR) reference. No synthetic degradation is used, and the scale factor is ×4 only.
 
 ## Results at a glance
-
-<details>
-<summary><b>Show the results table and key findings</b></summary>
 
 | Input to the detector | AP50_geo [95% CI] | gain vs LR [95% CI] | Verdict |
 | --- | --- | --- | --- |
@@ -25,6 +26,22 @@ This repository is a proxy experiment for one situation: only 1.2 m-class imager
 - **Generative SR adds buildings that are not there.** OSEDiff had the highest false-positive ratio, 0.204, against 0.139 on real HR.
 
 All numbers come from [results/summary.csv](results/summary.csv) and [results/posthoc/](results/posthoc). They hold only for this dataset (one city, one acquisition) and for a detector trained on HR and kept fixed.
+
+<details>
+<summary><b>All 8 SR models, sorted by AP50_geo</b></summary>
+
+| SR model | Family | AP50_geo [95% CI] | gain vs LR [95% CI] | Verdict |
+| --- | --- | --- | --- | --- |
+| Real-ESRGAN fine-tuned (S6) | Fine-tuned GAN | **0.808 [0.791, 0.825]** | **+0.077 [+0.056, +0.095]** | **useful** |
+| Real-ESRNet (S3) | Regression | 0.716 [0.692, 0.741] | -0.015 [-0.035, +0.003] | inconclusive |
+| Real-ESRGAN (S4) | GAN | 0.704 [0.679, 0.728] | -0.028 [-0.040, -0.015] | harmful |
+| OSEDiff (S7) | Diffusion | 0.688 [0.662, 0.715] | -0.043 [-0.056, -0.031] | harmful |
+| ResShift (S5) | Diffusion | 0.687 [0.658, 0.716] | -0.044 [-0.064, -0.027] | harmful |
+| Bicubic (S0) | Interpolation | 0.669 [0.639, 0.702] | -0.063 [-0.083, -0.044] | harmful |
+| Lanczos (S1) | Interpolation | 0.657 [0.623, 0.692] | -0.075 [-0.100, -0.053] | harmful |
+| SwinIR (S2) | Regression | 0.619 [0.586, 0.651] | -0.112 [-0.137, -0.087] | harmful |
+
+Full tables, recall by building size and image-quality metrics are in [Main results](#main-results).
 
 </details>
 
