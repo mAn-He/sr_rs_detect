@@ -8,6 +8,9 @@ English: [README.md](README.md)
 
 ## 결과 한눈에 보기
 
+<details>
+<summary><b>결과표와 핵심 발견 펼치기</b></summary>
+
 | 탐지기 입력 | AP50_geo [95% CI] | LR 대비 gain [95% CI] | 판정 |
 | --- | --- | --- | --- |
 | 실제 HR, 0.3 m (상한) | 0.845 [0.828, 0.861] | – | – |
@@ -23,11 +26,40 @@ English: [README.md](README.md)
 
 모든 수치는 [results/summary.csv](results/summary.csv)와 [results/posthoc/](results/posthoc)에서 나왔다. 이 데이터(도시 한 곳, 촬영 한 번)와 "HR로 학습해 고정한 탐지기" 조건에서만 성립한다.
 
+</details>
+
+## 벤치마크 데이터셋
+
+**SpaceNet 2, AOI_2_Vegas**는 라스베이거스 WorldView-3 영상으로 만든 공개 건물 footprint 벤치마크다. WorldView-3는 한 번 촬영할 때 전정색(PAN) 밴드 하나와 멀티스펙트럼(MS) 8밴드를 동시에 기록한다. MS 화소는 PAN 화소보다 4× 크다. 이는 센서 자체의 특성이지, 일부러 해상도를 낮춘 것이 아니다. SpaceNet은 원래 밴드와 함께, PAN의 디테일과 MS의 색을 합친 팬샤프닝 제품도 제공한다.
+
+| SpaceNet 2 폴더 | 내용 | 화소 | 이 실험에서 |
+| --- | --- | --- | --- |
+| PAN | 전정색 1밴드 | 약 0.3 m | 쓰지 않음 |
+| MS | 8밴드: Coastal, Blue, Green, Yellow, Red, Red Edge, NIR1, NIR2 | 약 1.2 m (칩당 163 × 163 px) | **LR 입력**, 밴드 5, 3, 2 (Red, Green, Blue) |
+| PS-MS | 팬샤프닝 8밴드 | 약 0.3 m | 쓰지 않음 |
+| PS-RGB | 팬샤프닝 Red, Green, Blue | 약 0.3 m (칩당 650 × 650 px) | **HR 기준** |
+| geojson_buildings | 건물 footprint 폴리곤 | – | 라벨 |
+
+- **영역.** 칩 하나는 약 157.8 m × 194.7 m다. 라벨이 있는 train 칩 3,850장은 라벨 없는 test 칩 사이에 흩어져 있다. 그래서 가장 조밀한 약 8.36 km × 6.81 km 창을 골라 그 안의 train 칩 1,168장만 받았다.
+- **값.** 두 제품 모두 11비트이고, 각자의 백분위 범위로 8비트로 변환했다.
+- **라벨과 분할.** 건물 35,265개를 576 m 공간 블록 단위로 train / val / test에 배정했다. 블록 118 / 26 / 24개, 건물 23,394 / 5,020 / 5,194개다.
+- **여기서 "HR"의 뜻.** HR 기준은 팬샤프닝 영상이라 같은 촬영의 PAN과 MS로 만들어진다. 쓸 수 있는 가장 좋은 0.3 m 컬러 영상이지만, 독립적인 측정값은 아니다.
+
+<details>
+<summary><b>Co-registration: "공통 UTM 격자"가 무슨 뜻인가</b></summary>
+
+- SpaceNet 칩은 지리 좌표(EPSG:4326, 도 단위)를 쓴다. 라스베이거스 위도에서는 도 단위로 정사각형인 화소가 지상에서는 정사각형이 아니다. PS-RGB 화소는 0.2427 m × 0.2995 m, MS 화소는 0.9677 m × 1.1944 m다(동서 × 남북).
+- UTM(Universal Transverse Mercator)은 좌표 단위가 미터인 지도 투영이다. 라스베이거스는 11N 구역(EPSG:32611)에 있다.
+- GDAL로 두 제품을 UTM 11N의 정렬된 격자로 변환했다. HR은 0.3 m, LR은 1.2 m이고 원점이 같아서 LR 화소 하나가 HR 화소 4 × 4개에 정확히 대응한다(assert로 확인). 그 결과 HR, LR, 모든 SR 출력, 라벨이 같은 화소 위치와 지도 좌표를 공유한다.
+- 변환 전에 MS 칩 메타데이터의 650 / 4 = 162.5 px 칩 위상 문제를 정정했고, 블록마다 ECC로 정합을 확인했다([엔지니어링 발견](#엔지니어링-발견)).
+
+</details>
+
 ## 무엇을 했나
 
 - **합성 축소가 아닌 실제 센서 쌍.** LR 입력은 1.2 m 멀티스펙트럼 제품이고, 기준은 같은 WorldView-3 촬영의 0.3 m 팬샤프닝 제품이다(SpaceNet 2 라스베이거스, 칩 1,168장).
 - **좌표를 유지하는 GDAL·OpenCV 파이프라인.** 두 제품을 LR 1화소가 HR 4×4화소에 정확히 대응하는 UTM 격자 하나로 맞췄다. 타일 예측은 지도 좌표에서 병합하고 그 자리에서 건물 footprint와 매칭했다.
-- **5계열 SR 8종**(보간, 회귀, GAN, 확산, 도메인 파인튜닝)을 하나의 고정 YOLO26s-OBB 탐지기에 넣고, LR로 직접 학습한 탐지기와 비교했다.
+- **탐지기 두 개를 직접 학습했다.** 둘 다 같은 구조이고, 공식 DOTA 사전학습 YOLO26s-OBB 가중치에서 같은 seed와 에폭 예산으로 출발했다. 하나는 LR 타일(기준선), 다른 하나는 HR 타일로 학습했다. HR 탐지기는 고정한 채 **5계열 SR 8종**(보간, 회귀, GAN, 확산, 도메인 파인튜닝) 각각의 출력에 그대로 적용했다.
 - **미리 정한 판정 규칙.** AP50 gain의 공간 블록 부트스트랩 CI로 useful, harmful, inconclusive를 정했다. 모든 임계값은 val에서 정해 test를 한 번 돌리기 전에 고정했다([docs/frozen_eval.md](docs/frozen_eval.md)).
 
 <details>

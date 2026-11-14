@@ -8,6 +8,9 @@ This repository is a proxy experiment for one situation: only 1.2 m-class imager
 
 ## Results at a glance
 
+<details>
+<summary><b>Show the results table and key findings</b></summary>
+
 | Input to the detector | AP50_geo [95% CI] | gain vs LR [95% CI] | Verdict |
 | --- | --- | --- | --- |
 | Real HR, 0.3 m (upper bound) | 0.845 [0.828, 0.861] | – | – |
@@ -23,11 +26,40 @@ This repository is a proxy experiment for one situation: only 1.2 m-class imager
 
 All numbers come from [results/summary.csv](results/summary.csv) and [results/posthoc/](results/posthoc). They hold only for this dataset (one city, one acquisition) and for a detector trained on HR and kept fixed.
 
+</details>
+
+## Benchmark dataset
+
+**SpaceNet 2, AOI_2_Vegas** is a public building-footprint benchmark built on WorldView-3 imagery of Las Vegas. One WorldView-3 acquisition records a panchromatic (PAN) band and 8 multispectral (MS) bands at the same time. The MS pixels are 4× coarser than the PAN pixels; that is a property of the sensor, not a downsampling step. SpaceNet ships the raw bands and pan-sharpened products, which fuse PAN detail with MS colour.
+
+| SpaceNet 2 folder | Content | Pixel | Used here |
+| --- | --- | --- | --- |
+| PAN | 1 panchromatic band | about 0.3 m | no |
+| MS | 8 bands: Coastal, Blue, Green, Yellow, Red, Red Edge, NIR1, NIR2 | about 1.2 m (163 × 163 px per chip) | **LR input**, bands 5, 3, 2 (Red, Green, Blue) |
+| PS-MS | 8 pan-sharpened bands | about 0.3 m | no |
+| PS-RGB | pan-sharpened Red, Green, Blue | about 0.3 m (650 × 650 px per chip) | **HR reference** |
+| geojson_buildings | building footprint polygons | – | labels |
+
+- **Area.** Each chip covers about 157.8 m × 194.7 m. The 3,850 labelled train chips are scattered between unlabelled test chips, so the densest window of about 8.36 km × 6.81 km was chosen and only its 1,168 train chips were downloaded.
+- **Values.** Both products are 11-bit; each is converted to 8-bit with its own percentile stretch.
+- **Labels and split.** 35,265 buildings, assigned by 576 m spatial blocks to train / val / test: 118 / 26 / 24 blocks with 23,394 / 5,020 / 5,194 buildings.
+- **What "HR" means here.** The HR reference is pan-sharpened, so it is derived from PAN and the same MS bands of the same acquisition. It is the best available 0.3 m colour image, not an independent measurement.
+
+<details>
+<summary><b>Co-registration: what "a common UTM grid" means</b></summary>
+
+- SpaceNet chips use geographic coordinates (EPSG:4326, degrees). At the latitude of Las Vegas a pixel that is square in degrees is not square on the ground: PS-RGB pixels are 0.2427 m × 0.2995 m and MS pixels 0.9677 m × 1.1944 m (east-west × north-south).
+- UTM (Universal Transverse Mercator) is a map projection whose coordinates are in metres. Las Vegas lies in zone 11N (EPSG:32611).
+- Both products were warped with GDAL to UTM 11N on aligned grids: HR at 0.3 m and LR at 1.2 m from the same origin, so one LR pixel covers exactly 4 × 4 HR pixels (checked by assertion). HR, LR, every SR output and the labels then share pixel positions and map coordinates.
+- Before warping, the MS chip metadata was corrected for the 650 / 4 = 162.5 px chip phase, and alignment was checked per block with ECC ([Engineering findings](#engineering-findings)).
+
+</details>
+
 ## What was done
 
 - **A real sensor pair, not synthetic downsampling.** The LR input is the 1.2 m multispectral product and the reference is the 0.3 m pan-sharpened product of the same WorldView-3 acquisition (SpaceNet 2, Las Vegas, 1,168 chips).
 - **A georeferenced GDAL and OpenCV pipeline.** Both products are warped to one UTM grid on which 1 LR pixel covers exactly 4×4 HR pixels. Tile predictions are merged in map coordinates and matched to building footprints there.
-- **8 SR methods from 5 families** (interpolation, regression, GAN, diffusion, domain fine-tuning) feed one frozen YOLO26s-OBB detector and are compared with a detector trained directly on LR.
+- **Two detectors trained here.** Both use the same architecture and start from the official DOTA-pretrained YOLO26s-OBB weights, with the same seed and epoch budget: one is trained on LR tiles (the baseline), the other on HR tiles. The HR detector is then frozen and applied to the output of each of **8 SR methods from 5 families** (interpolation, regression, GAN, diffusion, domain fine-tuning).
 - **A verdict rule fixed in advance.** A spatial-block bootstrap CI on the AP50 gain decides useful, harmful or inconclusive. All thresholds were set on val before a single test run ([docs/frozen_eval.md](docs/frozen_eval.md)).
 
 <details>
