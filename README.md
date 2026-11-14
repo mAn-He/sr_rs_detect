@@ -2,13 +2,41 @@
 
 Korean: [README.ko.md](README.ko.md)
 
+**Short answer: only when the SR model is fine-tuned on real sensor pairs.** Eight super-resolution (SR) methods were applied to real 1.2 m WorldView-3 multispectral imagery and judged by building-detection accuracy, not by PSNR. With a detector trained on HR and kept fixed, Real-ESRGAN fine-tuned on SpaceNet MS–PS pairs was the only method that beat detecting on the low-resolution input directly. Every public SR model, including both diffusion models, was harmful or inconclusive.
+
 This repository is a proxy experiment for one situation: only 1.2 m-class imagery without a panchromatic band is available (another satellite, or a product delivered without PAN), and it has to be brought to 0.3 m. SpaceNet 2 (AOI_2_Vegas) provides both products from the same WorldView-3 acquisition. The real 1.2 m multispectral (MS) GeoTIFF is the low-resolution (LR) input, and the 0.3 m pan-sharpened RGB (PS-RGB) is the high-resolution (HR) reference. No synthetic degradation is used, and the scale factor is ×4 only.
 
-## TL;DR
+## Results at a glance
 
-- With a YOLO26s-OBB detector trained on HR and kept fixed, on this dataset, only Real-ESRGAN fine-tuned on SpaceNet MS–PS pairs (S6) did better than detecting directly on the LR input with a detector trained on LR. AP50_geo was 0.808 vs 0.731, gain +0.077 [95% CI +0.056, +0.095], recovering 0.68 of the gap to HR (0.845).
-- Under the same condition, 6 of the 7 public SR models and interpolators were harmful (gain CI entirely below 0, from -0.028 to -0.112). Real-ESRNet (S3) was inconclusive (-0.015 [-0.035, +0.003]).
-- PSNR rank did not follow detection rank: Spearman ρ was 0.381 (p 0.352, n=8). LPIPS had ρ 0.786 (p 0.021, n=8). With S6 removed (post-hoc), LPIPS showed only a weak trend (n=7, p=0.094), and PSNR had ρ 0.071.
+| Input to the detector | AP50_geo [95% CI] | gain vs LR [95% CI] | Verdict |
+| --- | --- | --- | --- |
+| Real HR, 0.3 m (upper bound) | 0.845 [0.828, 0.861] | – | – |
+| **SR fine-tuned on real MS–PS pairs (S6)** | **0.808 [0.791, 0.825]** | **+0.077 [+0.056, +0.095]** | **useful**, recovers 68% of the gap |
+| LR directly, 1.2 m (path 1 baseline) | 0.731 [0.710, 0.754] | – | – |
+| Best public SR: Real-ESRNet (S3) | 0.716 [0.692, 0.741] | -0.015 [-0.035, +0.003] | inconclusive |
+| One-step diffusion: OSEDiff (S7) | 0.688 [0.662, 0.715] | -0.043 [-0.056, -0.031] | harmful |
+| Bicubic interpolation (S0) | 0.669 [0.639, 0.702] | -0.063 [-0.083, -0.044] | harmful |
+
+- **Small buildings are where SR matters.** For buildings under 50 m², recall rose from 0.027 (LR) to 0.283 (S6). The public SR models stayed at or below 0.088 and lost recall on the 50–400 m² houses that the LR detector already found.
+- **PSNR did not predict usefulness.** The Spearman correlation between PSNR rank and detection rank was 0.381 (p 0.352, n=8), and 0.071 with S6 removed.
+- **Generative SR adds buildings that are not there.** OSEDiff had the highest false-positive ratio, 0.204, against 0.139 on real HR.
+
+All numbers come from [results/summary.csv](results/summary.csv) and [results/posthoc/](results/posthoc). They hold only for this dataset (one city, one acquisition) and for a detector trained on HR and kept fixed.
+
+## What was done
+
+- **A real sensor pair, not synthetic downsampling.** The LR input is the 1.2 m multispectral product and the reference is the 0.3 m pan-sharpened product of the same WorldView-3 acquisition (SpaceNet 2, Las Vegas, 1,168 chips).
+- **A georeferenced GDAL and OpenCV pipeline.** Both products are warped to one UTM grid on which 1 LR pixel covers exactly 4×4 HR pixels. Tile predictions are merged in map coordinates and matched to building footprints there.
+- **8 SR methods from 5 families** (interpolation, regression, GAN, diffusion, domain fine-tuning) feed one frozen YOLO26s-OBB detector and are compared with a detector trained directly on LR.
+- **A verdict rule fixed in advance.** A spatial-block bootstrap CI on the AP50 gain decides useful, harmful or inconclusive. All thresholds were set on val before a single test run ([docs/frozen_eval.md](docs/frozen_eval.md)).
+
+## Problems solved along the way
+
+- **The data had holes.** SpaceNet interleaves train and test chips, so no contiguous labelled area exists. Chip footprints became the valid mask, holes were filled with a neutral colour, and a 9.6 m border was excluded from evaluation. The method ranking was the same at 0, 8 and 16 LR px insets.
+- **The registration check was wrong before the data was.** 110 of 168 blocks first failed alignment. A synthetic-shift test showed that OpenCV `phaseCorrelate` returns exactly +0.5 px on odd padded sizes. After the measurement was fixed, the remaining offset was traced to a 650 / 4 = 162.5 px chip phase and corrected by a geometric rule, not by per-chip fitting.
+- **A weak baseline would inflate every gain.** Whether the LR detector was under-trained was tested against a threshold written down in advance. It was met, so both detectors were retrained at 200 epochs.
+
+Details: [Method](#method) · [Main results](#main-results) · [Post-hoc analysis](#post-hoc-analysis-post-hoc-not-a-primary-result) · [Engineering findings](#engineering-findings) · [Limitations](#limitations) · [Reproduce](#reproduce)
 
 ## Question and motivation
 
