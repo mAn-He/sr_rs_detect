@@ -30,6 +30,36 @@ English: [README.md](README.md)
 - **5계열 SR 8종**(보간, 회귀, GAN, 확산, 도메인 파인튜닝)을 하나의 고정 YOLO26s-OBB 탐지기에 넣고, LR로 직접 학습한 탐지기와 비교했다.
 - **미리 정한 판정 규칙.** AP50 gain의 공간 블록 부트스트랩 CI로 useful, harmful, inconclusive를 정했다. 모든 임계값은 val에서 정해 test를 한 번 돌리기 전에 고정했다([docs/frozen_eval.md](docs/frozen_eval.md)).
 
+<details>
+<summary><b>파인튜닝한 SR 모델(S6)을 어떻게 학습했고, 파인튜닝 전과 비교하면 어떤가</b></summary>
+
+S6는 이 프로젝트에서 실제 영상 쌍으로 파인튜닝한 Real-ESRGAN이다. S4와 같은 공개 가중치에서 출발하므로 S6 − S4가 파인튜닝 효과다. 출처: [results/s6_finetune.json](results/s6_finetune.json), [results/S6_realesrgan_ft_spacenet.yml](results/S6_realesrgan_ft_spacenet.yml), [docs/decisions.md](docs/decisions.md).
+
+| 항목 | 설정 |
+| --- | --- |
+| 시작 가중치 | 공식 RealESRGAN_x4plus(생성기)와 RealESRGAN_x4plus_netD(U-Net 판별기) |
+| 학습 방식 | Real-ESRGAN 공식 paired-data 파인튜닝 설정에 가중치 경로, 데이터 경로, 반복 수, milestones를 이 실험에 맞게 지정 |
+| 학습 데이터 | train 블록 타일 쌍 433개: 실제 멀티스펙트럼 1.2 m(LR)와 같은 위치의 팬샤프닝 0.3 m(HR) |
+| 손실 | L1 픽셀 손실, 지각(perceptual) 손실, GAN 손실 |
+| 최적화 | Adam, 학습률 1e-4, 배치 12, HR 256 px 무작위 크롭 |
+| 반복 수 | 공식 400,000회 중 23,600회(5.9%). 반복당 0.4117 s를 실측해 3 h × 0.9 안에 맞춤 |
+| 시간 | RTX 4090 한 장에서 9,481 s |
+| 체크포인트 | 마지막 것. 시작 대비 가중치 최대 변화가 0.237로, 학습이 실제로 모델을 바꿨음 |
+| 누출 방지 | train 블록으로만 학습하고, 공간적으로 분리된 test 블록에서 평가 |
+
+| 지표 (test 블록) | S4, 공개 가중치 | S6, 파인튜닝 |
+| --- | --- | --- |
+| PSNR | 19.09 | 21.05 |
+| SSIM | 0.549 | 0.637 |
+| LPIPS (낮을수록 좋음) | 0.312 | 0.149 |
+| AP50_geo [95% CI] | 0.704 [0.679, 0.728] | 0.808 [0.791, 0.825] |
+| 50 m² 미만 건물 재현율 | 0.088 | 0.283 |
+| 거짓 양성 비율 | 0.172 | 0.147 |
+
+두 AP50_geo 신뢰구간은 겹치지 않는다. 이 비교는 HR로 학습해 고정한 탐지기 조건에서 성립한다.
+
+</details>
+
 ## 진행 중 풀어야 했던 문제
 
 - **데이터에 구멍이 있었다.** SpaceNet은 train·test 칩을 섞어 배치해 라벨이 이어진 영역이 없다. 칩 footprint로 유효 마스크를 만들고, 빈칸은 중립색으로 채우고, 경계 9.6 m는 평가에서 뺐다. 제외 폭 0, 8, 16 LR px 모두에서 방법 순위가 같았다.

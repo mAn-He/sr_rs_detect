@@ -30,6 +30,36 @@ All numbers come from [results/summary.csv](results/summary.csv) and [results/po
 - **8 SR methods from 5 families** (interpolation, regression, GAN, diffusion, domain fine-tuning) feed one frozen YOLO26s-OBB detector and are compared with a detector trained directly on LR.
 - **A verdict rule fixed in advance.** A spatial-block bootstrap CI on the AP50 gain decides useful, harmful or inconclusive. All thresholds were set on val before a single test run ([docs/frozen_eval.md](docs/frozen_eval.md)).
 
+<details>
+<summary><b>How the fine-tuned SR model (S6) was trained, and how it compares with the same model before fine-tuning</b></summary>
+
+S6 is Real-ESRGAN fine-tuned in this project on real image pairs. It starts from the same public weights as S4, so S6 − S4 isolates the effect of fine-tuning. Source: [results/s6_finetune.json](results/s6_finetune.json), [results/S6_realesrgan_ft_spacenet.yml](results/S6_realesrgan_ft_spacenet.yml), [docs/decisions.md](docs/decisions.md).
+
+| Item | Setting |
+| --- | --- |
+| Starting weights | official RealESRGAN_x4plus (generator) and RealESRGAN_x4plus_netD (U-Net discriminator) |
+| Recipe | official Real-ESRGAN paired-data fine-tuning config, with weight paths, data paths, iterations and milestones set for this run |
+| Training data | 433 train-block tile pairs: real multispectral 1.2 m (LR) with pan-sharpened 0.3 m (HR) of the same place |
+| Losses | L1 pixel loss, perceptual loss, GAN loss |
+| Optimiser | Adam, learning rate 1e-4, batch 12, random 256 px HR crops |
+| Iterations | 23,600 of the official 400,000 (5.9%), from a measured 0.4117 s per iteration within 3 h × 0.9 |
+| Time | 9,481 s on one RTX 4090 |
+| Checkpoint | the last one; the largest weight change from the start was 0.237, so training did change the model |
+| Leakage control | trained on train blocks only and evaluated on separate test blocks |
+
+| Metric (test blocks) | S4, public weights | S6, fine-tuned |
+| --- | --- | --- |
+| PSNR | 19.09 | 21.05 |
+| SSIM | 0.549 | 0.637 |
+| LPIPS (lower is better) | 0.312 | 0.149 |
+| AP50_geo [95% CI] | 0.704 [0.679, 0.728] | 0.808 [0.791, 0.825] |
+| Recall, buildings under 50 m² | 0.088 | 0.283 |
+| False-positive ratio | 0.172 | 0.147 |
+
+The two AP50_geo intervals do not overlap. The comparison holds for a detector trained on HR and kept fixed.
+
+</details>
+
 ## Problems solved along the way
 
 - **The data had holes.** SpaceNet interleaves train and test chips, so no contiguous labelled area exists. Chip footprints became the valid mask, holes were filled with a neutral colour, and a 9.6 m border was excluded from evaluation. The method ranking was the same at 0, 8 and 16 LR px insets.
