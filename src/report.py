@@ -1,5 +1,5 @@
 """results/summary.csv(행: HR 상한, 경로 1, 경로 2 SR 방법), 화질 지표 순위와 AP50 순위의 Spearman 상관, 그림 (a)~(h).
-`readme` 인자: README.md·README.ko.md의 결과표를 results/ CSV와 logs/timing.csv에서 다시 쓰고,
+`readme` 인자: README.md(한국어)·README_eng.md(영어)의 결과표를 results/ CSV와 logs/timing.csv에서 다시 쓰고,
 두 파일의 모든 수치·표·그림 경로·상대 링크를 대조해 docs/code_check.md에 남긴다."""
 import json
 import re
@@ -225,7 +225,7 @@ def main():
 
 
 # ---- README 결과표와 대조 (readme) ----
-DOCS = [g.ROOT / 'README.md', g.ROOT / 'README.ko.md']
+DOCS = [g.ROOT / 'README.md', g.ROOT / 'README_eng.md']
 BIN_TXT = {b: f'<{EDGES[1]:g}' if i == 0 else f'>{EDGES[i]:g}' if np.isinf(EDGES[i + 1]) else f'{EDGES[i]:g}–{EDGES[i + 1]:g}'
            for i, b in enumerate(BINS)}
 PH = R / 'posthoc'

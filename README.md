@@ -1,74 +1,74 @@
 # Super Resolution × Building Detection
 
-Korean: [README.ko.md](README.ko.md)
+English: [README_eng.md](README_eng.md)
 
-- Tests whether ×4 super-resolution of real low-resolution satellite imagery (1.2 m) improves building detection
-- A proxy for having only 1.2 m-class imagery without a PAN band. Uses real multispectral (LR) and pan-sharpened (HR) images of the same WorldView-3 acquisition from SpaceNet 2 Las Vegas, with no synthetic downsampling
-- Compares SR image-quality metrics (PSNR, SSIM, LPIPS) with performance on the downstream task (building detection)
+- 실제 저해상도 위성영상(1.2 m)을 Super Resolution(×4) 했을 때 건물 탐지 성능이 좋아지는지 검증한 연구
+- PAN 밴드 없이 1.2 m급 영상만 있는 상황의 대리 실험. SpaceNet 2 라스베이거스에서 같은 WorldView-3 촬영의 실제 멀티스펙트럼(LR)과 팬샤프닝(HR) 쌍 사용, 합성 축소 없음
+- SR 화질 지표(PSNR·SSIM·LPIPS)와 다운스트림 과제(건물 탐지) 성능을 종합적으로 비교함
 
-## Key results
+## 핵심 결과
 
-- **Only SR fine-tuned on real sensor pairs helped.** AP50_geo rose from 0.731 on the raw LR to 0.808, recovering 68% of the gap to HR (0.845)
-- **None of the 7 public SR models, diffusion included, beat detecting on LR directly.** harmful 6, inconclusive 1
-- **The effect is largest on small buildings.** Recall under 50 m² went from 0.027 to 0.283; public SR stayed at or below 0.088
-- **PSNR did not predict detection performance.** Rank correlation ρ 0.381 (p 0.352), and 0.071 without the fine-tuned model
-- **Generative SR produced more false positives.** OSEDiff false-positive ratio 0.204, against 0.139 on HR
-- **Conditions:** one city, one acquisition, a detector trained on HR and kept fixed
+- **실제 센서 쌍으로 파인튜닝한 SR만 유효.** AP50_geo가 LR 그대로 0.731에서 0.808로 오르고 HR(0.845)과의 격차 68% 회복
+- **공개 SR 7종은 확산 모델까지 모두 LR 직접 탐지를 넘지 못함.** harmful 6, inconclusive 1
+- **효과는 작은 건물에서 큼.** 50 m² 미만 재현율 0.027 → 0.283, 공개 SR은 0.088 이하
+- **PSNR은 탐지 성능을 예측하지 못함.** 순위 상관 ρ 0.381(p 0.352), 파인튜닝 모델을 빼면 0.071
+- **생성형 SR은 거짓 양성이 많음.** OSEDiff 거짓 양성 비율 0.204, HR은 0.139
+- **조건:** 도시 한 곳, 촬영 한 번, HR로 학습해 고정한 탐지기 기준
 
 ![gain forest plot](results/figures/report_g_gain_forest.png)
 
-*AP50_geo gain of each SR model over detecting on LR directly, with block-bootstrap 95% CI. S0 Bicubic, S1 Lanczos, S2 SwinIR, S3 Real-ESRNet, S4 Real-ESRGAN, S5 ResShift, S6 fine-tuned Real-ESRGAN, S7 OSEDiff.*
+*SR 모델별 LR 직접 탐지 대비 AP50_geo gain과 블록 부트스트랩 95% CI. S0 Bicubic, S1 Lanczos, S2 SwinIR, S3 Real-ESRNet, S4 Real-ESRGAN, S5 ResShift, S6 Real-ESRGAN 파인튜닝, S7 OSEDiff.*
 
-## Result images
+## 결과 이미지
 
-### Output of each SR model
+### SR 모델별 출력
 
 ![SR method grid](results/figures/report_c_method_grid.png)
 
-*HR, LR and the 8 SR outputs over the same area. Interpolation and regression models (S0–S3) leave edges blurred, while GAN and diffusion models (S4, S5, S7) draw new edges and texture. The fine-tuned model (S6) is closest to the HR roof outlines and colours and also scores best on image quality (PSNR 21.05, LPIPS 0.149).*
+*같은 영역의 HR, LR, SR 8종 출력. 보간·회귀 계열(S0~S3)은 경계가 흐리고 GAN·확산 계열(S4, S5, S7)은 경계와 질감을 새로 그림. 파인튜닝 모델(S6)이 HR의 지붕 윤곽과 색에 가장 가깝고 화질 지표도 가장 높음(PSNR 21.05, LPIPS 0.149).*
 
-### Detections
+### 탐지 결과
 
 ![qualitative b028_r1c0](results/figures/qualitative_b028_r1c0.png)
 
 ![qualitative b132_r0c0](results/figures/qualitative_b132_r0c0.png)
 
-*GT yellow, TP green, FP red. Two 153.6 m test windows with a median building count; geographic matching at the operating confidence.*
+*정답 노랑, TP 초록, FP 빨강. 건물 수가 중앙값 수준인 153.6 m test 창 두 곳, 운영 conf에서의 지리 매칭 결과.*
 
-### Recall by building size
+### 건물 크기별 재현율
 
 ![recall by area](results/figures/report_b_recall_by_area.png)
 
-*Only S6 is useful in every area bin. S3, S4, S5 and S7 are useful only under 50 m² and harmful in the 50–150 and 150–400 m² bins that the LR detector already handled well.*
+*S6만 모든 면적 구간에서 useful. S3·S4·S5·S7은 50 m² 미만에서만 useful이고 LR 탐지기가 이미 잘 찾던 50–150, 150–400 m² 구간에서는 harmful.*
 
-## Experimental design
+## 실험 설계
 
-![rs-sr-detect pipeline](results/figures/pipeline.png)
+![rs-sr-detect 파이프라인](results/figures/pipeline.png)
 
-| Item | Setting |
+| 항목 | 내용 |
 | --- | --- |
-| Data | SpaceNet 2 AOI_2_Vegas, 1,168 chips, 35,265 buildings. MS at 1.2 m as the LR input, PS-RGB at 0.3 m as the HR reference |
-| Registration | Warped with GDAL to a UTM 11N grid on which 1 LR pixel covers exactly 4×4 HR pixels |
-| Split | 576 m spatial blocks, train / val / test = 118 / 26 / 24 blocks |
-| Detectors | Two YOLO26s-OBB models: a baseline trained on LR and a detector trained on HR and kept fixed. Both start from DOTA-pretrained weights |
-| SR | 8 models from 5 families: interpolation (Bicubic, Lanczos), regression (SwinIR, Real-ESRNet), GAN (Real-ESRGAN), diffusion (ResShift, OSEDiff), fine-tuning (Real-ESRGAN trained on real MS–PS pairs) |
-| Verdict | Block-bootstrap 95% CI of the AP50_geo gain (1,000 resamples). Lower bound > 0 is useful, upper bound < 0 is harmful, otherwise inconclusive. Evaluation settings were chosen on val and frozen before test |
+| 데이터 | SpaceNet 2 AOI_2_Vegas 칩 1,168장, 건물 35,265개. MS 1.2 m를 LR 입력, PS-RGB 0.3 m를 HR 기준으로 사용 |
+| 정합 | GDAL로 UTM 11N 격자에 맞춤. LR 1화소가 HR 4×4화소에 정확히 대응 |
+| 분할 | 576 m 공간 블록 단위 train / val / test = 118 / 26 / 24블록 |
+| 탐지기 | YOLO26s-OBB 두 개. LR로 학습한 기준선, HR로 학습해 고정한 탐지기. 둘 다 DOTA 사전학습 가중치에서 출발 |
+| SR | 5계열 8종. 보간(Bicubic, Lanczos), 회귀(SwinIR, Real-ESRNet), GAN(Real-ESRGAN), 확산(ResShift, OSEDiff), 파인튜닝(실제 MS–PS 쌍으로 학습한 Real-ESRGAN) |
+| 판정 | AP50_geo gain의 블록 부트스트랩 95% CI(1,000회). 하한 > 0이면 useful, 상한 < 0이면 harmful, 그 밖은 inconclusive. 평가 설정은 val에서 정해 test 전에 고정 |
 
 <details>
-<summary><b>Full results (AP50, recall by area, image quality, sensitivity)</b></summary>
+<summary><b>전체 결과표 (AP50, 면적별 재현율, 화질 지표, 민감도)</b></summary>
 
-| SR model | Family | AP50_geo [95% CI] | gain vs LR [95% CI] | Verdict |
+| SR 모델 | 계열 | AP50_geo [95% CI] | LR 대비 gain [95% CI] | 판정 |
 | --- | --- | --- | --- | --- |
-| Real-ESRGAN fine-tuned (S6) | Fine-tuned GAN | **0.808 [0.791, 0.825]** | **+0.077 [+0.056, +0.095]** | **useful** |
-| Real-ESRNet (S3) | Regression | 0.716 [0.692, 0.741] | -0.015 [-0.035, +0.003] | inconclusive |
+| Real-ESRGAN fine-tuned (S6) | 파인튜닝 GAN | **0.808 [0.791, 0.825]** | **+0.077 [+0.056, +0.095]** | **useful** |
+| Real-ESRNet (S3) | 회귀 | 0.716 [0.692, 0.741] | -0.015 [-0.035, +0.003] | inconclusive |
 | Real-ESRGAN (S4) | GAN | 0.704 [0.679, 0.728] | -0.028 [-0.040, -0.015] | harmful |
-| OSEDiff (S7) | Diffusion | 0.688 [0.662, 0.715] | -0.043 [-0.056, -0.031] | harmful |
-| ResShift (S5) | Diffusion | 0.687 [0.658, 0.716] | -0.044 [-0.064, -0.027] | harmful |
-| Bicubic (S0) | Interpolation | 0.669 [0.639, 0.702] | -0.063 [-0.083, -0.044] | harmful |
-| Lanczos (S1) | Interpolation | 0.657 [0.623, 0.692] | -0.075 [-0.100, -0.053] | harmful |
-| SwinIR (S2) | Regression | 0.619 [0.586, 0.651] | -0.112 [-0.137, -0.087] | harmful |
+| OSEDiff (S7) | 확산 | 0.688 [0.662, 0.715] | -0.043 [-0.056, -0.031] | harmful |
+| ResShift (S5) | 확산 | 0.687 [0.658, 0.716] | -0.044 [-0.064, -0.027] | harmful |
+| Bicubic (S0) | 보간 | 0.669 [0.639, 0.702] | -0.063 [-0.083, -0.044] | harmful |
+| Lanczos (S1) | 보간 | 0.657 [0.623, 0.692] | -0.075 [-0.100, -0.053] | harmful |
+| SwinIR (S2) | 회귀 | 0.619 [0.586, 0.651] | -0.112 [-0.137, -0.087] | harmful |
 
-Test blocks, 4,426 GT buildings in the evaluation zone, buffer 8 LR px. Source: [results/summary.csv](results/summary.csv).
+test 블록, 평가 영역 안 정답 건물 4,426개, 제외 폭 8 LR px. 출처: [results/summary.csv](results/summary.csv).
 
 <!-- BEGIN:main -->
 | method | path | AP50_geo [95% CI] | gain vs LR [95% CI] | recovery | verdict | FP |
@@ -85,7 +85,7 @@ Test blocks, 4,426 GT buildings in the evaluation zone, buffer 8 LR px. Source: 
 | S7_osediff_x4 | path2 (D_HR on SR) | 0.688 [0.662, 0.715] | -0.043 [-0.056, -0.031] | -0.38 | **harmful** | 763 |
 <!-- END:main -->
 
-Recall by building area (operating confidence) and its gain verdict against path 1:
+면적 구간별 재현율(운영 conf)과 경로 1 대비 gain 판정:
 
 <!-- BEGIN:recall -->
 | method | <50 m² | 50–150 m² | 150–400 m² | >400 m² | verdict vs LR (<50 / 50–150 / 150–400 / >400) |
@@ -102,7 +102,7 @@ Recall by building area (operating confidence) and its gain verdict against path
 | S7_osediff_x4 | 0.078 [0.059, 0.096] | 0.618 [0.523, 0.698] | 0.908 [0.878, 0.932] | 0.774 [0.636, 0.856] | useful / harmful / harmful / inconclusive |
 <!-- END:recall -->
 
-Image-quality metrics (evaluation mask) and processing time (model loading excluded; loading time listed separately):
+화질 지표(평가 영역 마스크)와 처리 시간(모델 로딩 제외, 로딩 시간은 따로 표시):
 
 <!-- BEGIN:quality -->
 | method | PSNR | SSIM | LPIPS | edge_precision | edge_recall | sharpness_ratio | SR s/km² | SR load s | det s/km² |
@@ -117,7 +117,7 @@ Image-quality metrics (evaluation mask) and processing time (model loading exclu
 | S7_osediff_x4 | 18.49 | 0.495 | 0.334 | 0.795 | 0.693 | 1.216 | 16.1 | 96.6 | 0.4 |
 <!-- END:quality -->
 
-Spearman correlation between the rank of each quality metric and the AP50_geo rank (the 8 SR methods):
+화질 지표 순위와 AP50_geo 순위 사이의 Spearman 상관(SR 방법 8개):
 
 <!-- BEGIN:spearman -->
 | metric | Spearman ρ vs AP50_geo | p | n |
@@ -129,7 +129,7 @@ Spearman correlation between the rank of each quality metric and the AP50_geo ra
 | edge_recall | 0.214 | 0.610 | 8 |
 <!-- END:spearman -->
 
-Buffer sensitivity (evaluation-zone inset 0 / 8 / 16 LR px):
+제외 폭 민감도(평가 영역을 안쪽으로 0 / 8 / 16 LR px 줄임):
 
 <!-- BEGIN:buffer -->
 | method | 0 LR px: AP50 / gain / verdict | 8 LR px: AP50 / gain / verdict | 16 LR px: AP50 / gain / verdict |
@@ -146,116 +146,116 @@ Buffer sensitivity (evaluation-zone inset 0 / 8 / 16 LR px):
 | S7_osediff_x4 | 0.669 / -0.048 / harmful | 0.688 / -0.043 / harmful | 0.689 / -0.044 / harmful |
 <!-- END:buffer -->
 
-- S6 is the only useful method, for AP50_geo and in every area bin. Its gain for buildings under 50 m² is +0.256 [+0.213, +0.298]
-- S3, S4, S5 and S7 are useful only for buildings under 50 m² and harmful in the 50–150 and 150–400 m² bins. Their overall AP50_geo gain is negative or inconclusive
-- The ranking of methods is the same at all 3 buffer widths. Only S3 changes verdict: harmful at 0 and 16 LR px, inconclusive at 8 LR px
-- Time: S6 costs 1.164 s/km² of SR plus 29.07 s of model loading, on the same scale as D_HR detection on S6 output (0.459 s/km²). The diffusion models S5 and S7 take 14.901 and 16.150 s/km² and are harmful ([results/figures/report_e_time_vs_ap50.png](results/figures/report_e_time_vs_ap50.png))
+- useful인 방법은 S6 하나. AP50_geo와 모든 면적 구간에서 같음. 50 m² 미만 건물의 gain은 +0.256 [+0.213, +0.298]
+- S3, S4, S5, S7은 50 m² 미만 건물에서만 useful이고 50–150, 150–400 m² 구간에서는 harmful. 전체 AP50_geo gain은 음수이거나 inconclusive
+- 방법 순위는 제외 폭 3가지에서 모두 같음. S3만 0과 16 LR px에서 harmful, 8 LR px에서 inconclusive라 판정이 제외 폭에 따라 달라짐
+- 시간: S6의 SR은 1.164 s/km²에 모델 로딩 29.07 s. S6 출력에 대한 D_HR 탐지(0.459 s/km²)와 같은 규모. 확산 모델 S5와 S7은 14.901, 16.150 s/km²가 들고 harmful([results/figures/report_e_time_vs_ap50.png](results/figures/report_e_time_vs_ap50.png))
 
 </details>
 
 <details>
-<summary><b>Dataset and preprocessing (SpaceNet 2, common UTM grid)</b></summary>
+<summary><b>데이터셋과 전처리 (SpaceNet 2, 공통 UTM 격자)</b></summary>
 
-**SpaceNet 2, AOI_2_Vegas** is a public building-footprint benchmark built on WorldView-3 imagery of Las Vegas. One WorldView-3 acquisition records a panchromatic (PAN) band and 8 multispectral (MS) bands at the same time. The MS pixels are 4× coarser than the PAN pixels; that is a property of the sensor, not a downsampling step. SpaceNet ships the raw bands and pan-sharpened products, which fuse PAN detail with MS colour.
+**SpaceNet 2, AOI_2_Vegas**는 라스베이거스 WorldView-3 영상으로 만든 공개 건물 footprint 벤치마크. WorldView-3는 한 번 촬영할 때 전정색(PAN) 밴드 하나와 멀티스펙트럼(MS) 8밴드를 함께 기록함. MS 화소가 PAN 화소보다 4× 큰 것은 센서 자체의 특성이지 일부러 해상도를 낮춘 결과가 아님. SpaceNet은 원래 밴드와 함께 PAN의 디테일과 MS의 색을 합친 팬샤프닝 제품도 제공함.
 
-| SpaceNet 2 folder | Content | Pixel | Used here |
+| SpaceNet 2 폴더 | 내용 | 화소 | 이 실험에서 |
 | --- | --- | --- | --- |
-| PAN | 1 panchromatic band | about 0.3 m | no |
-| MS | 8 bands: Coastal, Blue, Green, Yellow, Red, Red Edge, NIR1, NIR2 | about 1.2 m (163 × 163 px per chip) | **LR input**, bands 5, 3, 2 (Red, Green, Blue) |
-| PS-MS | 8 pan-sharpened bands | about 0.3 m | no |
-| PS-RGB | pan-sharpened Red, Green, Blue | about 0.3 m (650 × 650 px per chip) | **HR reference** |
-| geojson_buildings | building footprint polygons | – | labels |
+| PAN | 전정색 1밴드 | 약 0.3 m | 쓰지 않음 |
+| MS | 8밴드: Coastal, Blue, Green, Yellow, Red, Red Edge, NIR1, NIR2 | 약 1.2 m (칩당 163 × 163 px) | **LR 입력**, 밴드 5, 3, 2 (Red, Green, Blue) |
+| PS-MS | 팬샤프닝 8밴드 | 약 0.3 m | 쓰지 않음 |
+| PS-RGB | 팬샤프닝 Red, Green, Blue | 약 0.3 m (칩당 650 × 650 px) | **HR 기준** |
+| geojson_buildings | 건물 footprint 폴리곤 | – | 라벨 |
 
-- **Area.** Each chip covers about 157.8 m × 194.7 m. The 3,850 labelled train chips are scattered between unlabelled test chips, so the densest window of about 8.36 km × 6.81 km was chosen and only its 1,168 train chips were downloaded from `s3://spacenet-dataset/spacenet/SN2_buildings/train/AOI_2_Vegas/`. Details in [docs/data_report.md](docs/data_report.md)
-- **LR input.** MS bands 5, 3, 2 (Red, Green, Blue of the WorldView-3 8-band order), warped to a 1.2 m UTM grid (EPSG:32611). The band choice was checked by correlating each MS band with PS-RGB averaged to the MS grid
-- **HR reference.** PS-RGB warped to a 0.3 m grid. **PS-RGB is a pan-sharpened product** made from the PAN and MS bands of the same acquisition: the best available 0.3 m colour image, but not an independent measurement
-- **8-bit conversion.** Both products are 11-bit. Each gets its own 2–98 percentile stretch per band, computed on train blocks only
-- **Spatial split.** 35,265 buildings assigned by 576 m blocks (LR 480 px) to train / val / test by building count: 118 / 26 / 24 blocks with 23,394 / 5,020 / 5,194 buildings. Tiles are 307.2 m (HR 1024 px, LR 256 px), 2×2 per block, and never cross a block boundary
-- **NoData and evaluation zone.** Train and test chips are interleaved, so the downloaded window has holes. The valid mask is the union of chip footprints, not pixel values, and invalid pixels are filled with the train-block mean colour. Every SR output is overwritten with the same fill. The evaluation zone is the footprint shrunk inward by 9.6 m (8 LR px); GT and predictions with at least 50% of their area outside it are dropped from TP, FP and FN
+- **영역.** 칩 하나는 약 157.8 m × 194.7 m. 라벨이 있는 train 칩 3,850장이 라벨 없는 test 칩 사이에 흩어져 있어 가장 조밀한 약 8.36 km × 6.81 km 창을 골라 그 안의 train 칩 1,168장만 받음. 경로는 `s3://spacenet-dataset/spacenet/SN2_buildings/train/AOI_2_Vegas/`, 자세한 내용은 [docs/data_report.md](docs/data_report.md)
+- **LR 입력.** MS 밴드 5, 3, 2(WorldView-3 8밴드 순서의 Red, Green, Blue)를 1.2 m UTM 격자(EPSG:32611)로 워프. 밴드 선택은 PS-RGB를 MS 격자로 평균 축소해 MS 밴드별 상관을 재서 확인
+- **HR 기준.** PS-RGB를 0.3 m 격자로 워프. **PS-RGB는 같은 촬영의 PAN과 MS를 합친 팬샤프닝 산출물**이라 쓸 수 있는 가장 좋은 0.3 m 컬러 영상이지만 독립적인 측정값은 아님
+- **8비트 변환.** 두 제품 모두 11비트. 제품마다 밴드별 2–98 백분위 스트레치를 따로 적용하고 백분위는 train 블록에서만 계산
+- **공간 분할.** 건물 35,265개를 576 m 블록(LR 480 px) 단위로 건물 수 기준 train / val / test에 배정. 118 / 26 / 24블록, 건물 23,394 / 5,020 / 5,194개. 타일은 307.2 m(HR 1024 px, LR 256 px)이고 블록당 2×2, 블록 경계를 넘지 않음
+- **NoData와 평가 영역.** train 칩과 test 칩이 섞여 있어 받은 창 안에 빈칸이 있음. 유효 마스크는 픽셀값이 아니라 칩 footprint 합집합으로 만들고 무효 화소는 train 블록 평균색으로 채움. 모든 SR 출력도 같은 값으로 다시 덮음. 평가 영역은 footprint를 안쪽으로 9.6 m(8 LR px) 줄인 영역이고 면적의 50% 이상이 이 영역 밖인 정답과 예측은 TP, FP, FN에서 모두 뺌
 
-**Common UTM grid**
+**공통 UTM 격자**
 
-- SpaceNet chips use geographic coordinates (EPSG:4326, degrees), so at the latitude of Las Vegas the pixels are not square on the ground. PS-RGB pixels are 0.2427 m × 0.2995 m and MS pixels 0.9677 m × 1.1944 m (east-west × north-south)
-- UTM (Universal Transverse Mercator) is a map projection in metres. Las Vegas lies in zone 11N (EPSG:32611)
-- Both products were warped with GDAL to aligned UTM 11N grids: HR at 0.3 m and LR at 1.2 m from the same origin, so one LR pixel covers exactly 4 × 4 HR pixels (checked by assertion). HR, LR, every SR output and the labels share pixel positions and map coordinates
-- Before warping, the MS chip metadata was corrected for the 650 / 4 = 162.5 px chip phase, and alignment was checked per block with ECC (see "Problems solved along the way")
+- SpaceNet 칩은 지리 좌표(EPSG:4326, 도 단위)를 써서 라스베이거스 위도에서는 화소가 지상에서 정사각형이 아님. PS-RGB 화소는 0.2427 m × 0.2995 m, MS 화소는 0.9677 m × 1.1944 m(동서 × 남북)
+- UTM(Universal Transverse Mercator)은 좌표 단위가 미터인 지도 투영. 라스베이거스는 11N 구역(EPSG:32611)
+- GDAL로 두 제품을 UTM 11N의 정렬된 격자로 변환. HR 0.3 m, LR 1.2 m에 원점이 같아 LR 화소 하나가 HR 화소 4 × 4개에 정확히 대응함(assert로 확인). HR, LR, 모든 SR 출력, 라벨이 같은 화소 위치와 지도 좌표를 공유
+- 변환 전에 MS 칩 메타데이터의 650 / 4 = 162.5 px 칩 위상 문제를 정정하고 블록마다 ECC로 정합을 확인(아래 '진행 중 풀어야 했던 문제')
 
 </details>
 
 <details>
-<summary><b>How the fine-tuned SR model (S6) was trained, and how it compares with the model before fine-tuning</b></summary>
+<summary><b>파인튜닝한 SR 모델(S6)의 학습 설정과 파인튜닝 전 비교</b></summary>
 
-S6 is Real-ESRGAN fine-tuned on real image pairs. It starts from the same public weights as S4, so S6 − S4 isolates the effect of fine-tuning. Source: [results/s6_finetune.json](results/s6_finetune.json), [results/S6_realesrgan_ft_spacenet.yml](results/S6_realesrgan_ft_spacenet.yml), [docs/decisions.md](docs/decisions.md).
+S6는 실제 영상 쌍으로 파인튜닝한 Real-ESRGAN. S4와 같은 공개 가중치에서 출발하므로 S6 − S4가 파인튜닝 효과. 출처: [results/s6_finetune.json](results/s6_finetune.json), [results/S6_realesrgan_ft_spacenet.yml](results/S6_realesrgan_ft_spacenet.yml), [docs/decisions.md](docs/decisions.md).
 
-| Item | Setting |
+| 항목 | 설정 |
 | --- | --- |
-| Starting weights | official RealESRGAN_x4plus (generator) and RealESRGAN_x4plus_netD (U-Net discriminator) |
-| Recipe | official Real-ESRGAN paired-data fine-tuning config, with weight paths, data paths, iterations and milestones set for this run |
-| Training data | 433 train-block tile pairs: real multispectral 1.2 m (LR) with pan-sharpened 0.3 m (HR) of the same place |
-| Losses | L1 pixel loss, perceptual loss, GAN loss |
-| Optimiser | Adam, learning rate 1e-4, batch 12, random 256 px HR crops |
-| Iterations | 23,600 of the official 400,000 (5.9%), from a measured 0.4117 s per iteration within 3 h × 0.9 |
-| Time | 9,481 s on one RTX 4090 |
-| Checkpoint | the last one; the largest weight change from the start was 0.237, so training did change the model |
-| Leakage control | trained on train blocks only and evaluated on spatially separate test blocks |
+| 시작 가중치 | 공식 RealESRGAN_x4plus(생성기)와 RealESRGAN_x4plus_netD(U-Net 판별기) |
+| 학습 방식 | Real-ESRGAN 공식 paired-data 파인튜닝 설정에 가중치 경로, 데이터 경로, 반복 수, milestones를 이 실험에 맞게 지정 |
+| 학습 데이터 | train 블록 타일 쌍 433개: 실제 멀티스펙트럼 1.2 m(LR)와 같은 위치의 팬샤프닝 0.3 m(HR) |
+| 손실 | L1 픽셀 손실, 지각(perceptual) 손실, GAN 손실 |
+| 최적화 | Adam, 학습률 1e-4, 배치 12, HR 256 px 무작위 크롭 |
+| 반복 수 | 공식 400,000회 중 23,600회(5.9%). 반복당 0.4117 s를 실측해 3 h × 0.9 안에 맞춤 |
+| 시간 | RTX 4090 한 장에서 9,481 s |
+| 체크포인트 | 마지막 것. 시작 대비 가중치 최대 변화가 0.237로 학습이 실제로 모델을 바꿈 |
+| 누출 방지 | train 블록으로만 학습하고 공간적으로 분리된 test 블록에서 평가 |
 
-| Metric (test blocks) | S4, public weights | S6, fine-tuned |
+| 지표 (test 블록) | S4, 공개 가중치 | S6, 파인튜닝 |
 | --- | --- | --- |
 | PSNR | 19.09 | 21.05 |
 | SSIM | 0.549 | 0.637 |
-| LPIPS (lower is better) | 0.312 | 0.149 |
+| LPIPS (낮을수록 좋음) | 0.312 | 0.149 |
 | AP50_geo [95% CI] | 0.704 [0.679, 0.728] | 0.808 [0.791, 0.825] |
-| Recall, buildings under 50 m² | 0.088 | 0.283 |
-| False-positive ratio | 0.172 | 0.147 |
+| 50 m² 미만 건물 재현율 | 0.088 | 0.283 |
+| 거짓 양성 비율 | 0.172 | 0.147 |
 
-The two AP50_geo intervals do not overlap. The comparison holds for a detector trained on HR and kept fixed.
+두 AP50_geo 신뢰구간은 겹치지 않음. HR로 학습해 고정한 탐지기 조건에서 성립하는 비교.
 
 </details>
 
 <details>
-<summary><b>Method details (detection paths, matching, verdict, frozen settings)</b></summary>
+<summary><b>방법 상세 (탐지 경로, 매칭, 판정, 설정 고정)</b></summary>
 
-- **Path 1 (lower bound):** D_LR, a YOLO26s-OBB trained on LR tiles (imgsz 256), detects on LR
-- **Path 2:** D_HR, the same architecture trained on HR tiles (imgsz 1024), detects on each SR output. D_HR is never retrained for an SR method, so every conclusion carries the condition "with a detector trained on HR and kept fixed"
-- **Upper bound:** D_HR on HR
-- **SR methods (×4, same 8-bit LR tiles as input):**
+- **경로 1(하한):** LR 타일로 학습한 YOLO26s-OBB인 D_LR(imgsz 256)로 LR을 탐지
+- **경로 2:** 같은 구조를 HR 타일로 학습한 D_HR(imgsz 1024)로 각 SR 출력을 탐지. SR 방법마다 D_HR을 다시 학습하지 않으므로 모든 결론에 "HR로 학습해 고정한 탐지기를 쓸 때"라는 조건이 붙음
+- **상한:** D_HR로 HR을 탐지
+- **SR 방법(×4, 입력은 모두 같은 8비트 LR 타일):**
 
-  | ID | Category | Method |
+  | ID | 범주 | 방법 |
   |---|---|---|
-  | S0 / S1 | Interpolation | GDAL cubic / lanczos |
-  | S2 | Regression | SwinIR classical ×4 (DF2K) |
-  | S3 | Regression | Real-ESRNet x4plus |
+  | S0 / S1 | 보간 | GDAL cubic / lanczos |
+  | S2 | 회귀 | SwinIR classical ×4 (DF2K) |
+  | S3 | 회귀 | Real-ESRNet x4plus |
   | S4 | GAN | Real-ESRGAN x4plus |
-  | S5 | Diffusion (efficient) | ResShift v3 |
-  | S6 | Domain fine-tuning | Real-ESRGAN fine-tuned on train-block MS–PS pairs |
-  | S7 | One-step diffusion | OSEDiff |
+  | S5 | Diffusion(효율형) | ResShift v3 |
+  | S6 | 도메인 파인튜닝 | train 블록 MS–PS 쌍으로 파인튜닝한 Real-ESRGAN |
+  | S7 | 단일 스텝 Diffusion | OSEDiff |
 
-  S6 used the official paired-data fine-tuning config, starting from RealESRGAN_x4plus. Its 23,600 iterations follow from a measured 0.4117 s/iter and a 3 h budget
-- **Merging and matching:** tile predictions are merged with `cv2.dnn.NMSBoxesRotated` per block at IoU 0.5, then matched to GT (minimum rotated rectangle of each footprint) in UTM at rotated IoU ≥ 0.5
-- **Metrics:** AP50_geo uses predictions with conf ≥ 0.001 and max_det 3000. Recall by area and false positives use an operating confidence chosen on val by maximum F1: 0.503 for D_HR (also applied to every SR row) and 0.562 for D_LR
-- **Verdict:** 95% CIs come from a test-block bootstrap (1,000 resamples, seed 0). gain = AP50_geo(path 2) − AP50_geo(path 1), computed on the same resample. **useful** if the gain CI lower bound is above 0, **harmful** if the upper bound is below 0, **inconclusive** otherwise. recovery = gain / (AP50_geo(HR) − AP50_geo(LR))
-- **Settings frozen before test:** detector weights (SHA256), max_det, merge IoU, operating confidences, buffer, Canny thresholds and the code commit were recorded in [docs/frozen_eval.md](docs/frozen_eval.md) before the test blocks were evaluated. Everything was chosen on train or val blocks. The later post-hoc rerun is logged in the same file
-- **200-epoch decision (rule fixed in advance):** the first D_LR ran to the 100-epoch default without early stopping. Before training a separate 200-epoch D_LR, the rule was set: retrain both detectors at 200 epochs if LR val AP50_geo rises by ≥ 0.01. It rose from 0.6619 to 0.6743 (+0.0124), so both detectors were retrained with epochs 200 and patience 20. D_HR early-stopped at 86 epochs; D_LR ran all 200. Best weights were chosen on val by the Ultralytics default fitness, mAP50-95 ([docs/decisions.md](docs/decisions.md))
-
-</details>
-
-<details>
-<summary><b>Problems solved along the way (data holes, registration check, baseline)</b></summary>
-
-- **The data had holes.** In AOI_2_Vegas the train chips occupy 54% of the chip grid (3,850 of 7,120 cells), scattered between test chips that have no public labels. The largest hole-free square is 4×4 chips, so a contiguous 1,200-chip area does not exist. The densest rectangle (35 × 53 chips, 1,168 train chips, density 0.63) was used, with the holes handled by the footprint mask. A 9.6 m border was excluded from evaluation, and the method ranking was the same at 0, 8 and 16 LR px insets ([docs/data_report.md](docs/data_report.md), [docs/decisions.md](docs/decisions.md))
-- **The registration check was wrong before the data was.** 110 of 168 blocks first failed the 0.5 LR px threshold. `phaseCorrelate` in OpenCV pads its input to `getOptimalDFTSize`, and on any axis where that size is odd the estimate is biased by exactly +0.5 px. With identical images, widths 128, 144, 150 and 160 gave 0.000 and widths 129, 130 and 135 gave 0.500. In a synthetic test on 41 chips (HR averaged to 1.2 m, shifted by 0, 0.25 and 0.5 px), phaseCorrelate returned +0.500 at zero shift on the east–west axis, while ECC had a maximum error of 0.017 px. The fix crops each window to an even optimal DFT size and records ECC as a cross-check ([scripts/diag/g5_investigate.py](scripts/diag/g5_investigate.py))
-- **MS chip origin phase from 162.5.** Each 650 px PS-RGB chip has a 163 px MS chip with the same corner coordinates, but 650 / 4 = 162.5. The metadata stretches the MS pixel to fit the chip. Chip-centre east–west offsets split by global chip column parity (even columns -0.125, odd columns +0.390 MS px, a difference of 0.515 MS px). It was corrected by a geometric rule with no per-chip measurement: the east–west pixel is set to 4× PS, and the origin of odd-column chips is moved by −2 PS px. After it the residual IQR width was 0.106 MS px, and the number of blocks over 0.5 LR px fell from 9 to 6 of 168 (all train, all caused by the north–south offset) ([scripts/diag/g5_phase.py](scripts/diag/g5_phase.py), [scripts/diag/g5_rule_sim.py](scripts/diag/g5_rule_sim.py), [results/figures/g5_before_after/](results/figures/g5_before_after/))
-- **North–south residual left uncorrected.** LR content sits north of HR by a block ECC median of -0.265 LR px (IQR -0.345 to -0.199), about 0.3 m, with the same sign across the area. A north–south pixel-size hypothesis raised the blocks over 0.5 LR px from 6 to 69 of 168, so it was not applied. The cause is unknown. The largest test-block offset is 0.496 LR px, just under the 0.5 threshold ([results/figures/g5_offset_map.png](results/figures/g5_offset_map.png))
-- **A weak baseline would inflate every gain.** Whether the LR detector was under-trained was tested against a threshold written down in advance; it was met, so both detectors were retrained at 200 epochs (see "Method details")
+  S6는 공식 paired data 파인튜닝 설정으로 RealESRGAN_x4plus에서 시작. 반복 횟수 23,600회는 실측 반복당 0.4117 s와 3시간 예산으로 정함
+- **병합과 매칭:** 타일 예측은 블록마다 `cv2.dnn.NMSBoxesRotated`(IoU 0.5)로 병합하고 UTM에서 정답(각 건물 폴리곤의 최소 회전 사각형)과 회전 IoU ≥ 0.5로 매칭
+- **지표:** AP50_geo는 conf ≥ 0.001, max_det 3000인 예측으로 계산. 면적 구간별 재현율과 거짓 양성(FP) 수는 val에서 F1이 최대인 운영 conf 사용. D_HR 0.503(모든 SR 행에도 적용), D_LR 0.562
+- **판정:** 95% 신뢰구간은 test 블록 bootstrap(블록 복원추출 재표본, 1,000회, seed 0). gain = AP50_geo(경로 2) − AP50_geo(경로 1)이고 같은 재표본에서 계산. gain 신뢰구간 하한이 0보다 크면 **useful**, 상한이 0보다 작으면 **harmful**, 그 밖은 **inconclusive**. recovery = gain / (AP50_geo(HR) − AP50_geo(LR))
+- **test 전 설정 고정:** 탐지기 가중치(SHA256), max_det, 병합 IoU, 운영 conf, 제외 폭, Canny 임계값, 코드 커밋을 test 블록 평가 전에 [docs/frozen_eval.md](docs/frozen_eval.md)에 기록. 모든 값은 train 또는 val 블록에서 정함. 이후의 사후 분석 재실행도 같은 파일에 기록
+- **200에폭 결정(사전에 고정한 기준):** 처음 학습한 D_LR은 조기 종료 없이 기본값 100에폭 상한까지 돌았음. 200에폭 D_LR을 따로 학습하기 전에 LR val AP50_geo가 0.01 이상 오르면 두 탐지기를 모두 200에폭으로 다시 학습한다는 기준을 정함. 결과는 0.6619에서 0.6743으로 +0.0124 올라 두 탐지기를 epochs 200, patience 20으로 다시 학습. D_HR은 86에폭에서 조기 종료, D_LR은 200에폭을 모두 돌았음. 최적 가중치는 val에서 Ultralytics 기본 fitness인 mAP50-95로 고름([docs/decisions.md](docs/decisions.md))
 
 </details>
 
 <details>
-<summary><b>Post-hoc analysis (not a primary result)</b></summary>
+<summary><b>진행 중 풀어야 했던 문제 (데이터 빈칸, 정합 검사, 기준선)</b></summary>
 
-These analyses were requested after the test results had been seen. They reuse the frozen detectors and evaluation settings and are stored separately in [results/posthoc/](results/posthoc/). [results/summary.csv](results/summary.csv) and the verdicts above are unchanged. CIs use the same block-bootstrap resamples (verified to reproduce the main AP50 and CI).
+- **데이터에 구멍이 있었음.** AOI_2_Vegas에서 train 칩은 칩 격자의 54%(7,120칸 중 3,850칸)만 차지하고 공개 라벨이 없는 test 칩 사이에 흩어져 있음. 빈칸 없는 정사각형은 최대 4×4칩이라 인접한 1,200장 영역은 존재하지 않음. 가장 조밀한 직사각형(35 × 53칩, train 칩 1,168장, 밀도 0.63)을 쓰고 빈칸은 footprint 마스크로 처리. 경계 9.6 m를 평가에서 빼고 제외 폭 0, 8, 16 LR px 모두에서 방법 순위가 같음을 확인([docs/data_report.md](docs/data_report.md), [docs/decisions.md](docs/decisions.md))
+- **데이터보다 정합 검사가 먼저 틀려 있었음.** 처음에는 168개 블록 중 110개가 0.5 LR px 기준을 넘음. OpenCV `phaseCorrelate`는 입력을 `getOptimalDFTSize`로 늘리는데 그 크기가 홀수인 축에서 추정값이 정확히 +0.5 px 치우침. 같은 영상끼리 비교하면 폭 128, 144, 150, 160은 0.000, 폭 129, 130, 135는 0.500. 칩 41장 합성 검증(HR을 1.2 m로 평균 축소하고 0, 0.25, 0.5 px 이동)에서 phaseCorrelate는 이동이 없을 때 동서 축에서 +0.500을 냈고 ECC의 최대 오차는 0.017 px. 창을 짝수 최적 DFT 크기로 자르고 ECC를 교차 확인값으로 함께 기록하도록 고침([scripts/diag/g5_investigate.py](scripts/diag/g5_investigate.py))
+- **162.5에서 생기는 MS 칩 원점 위상.** 650 px PS-RGB 칩마다 모서리 좌표가 같은 163 px MS 칩이 있지만 650 / 4 = 162.5. 메타데이터는 MS 화소를 칩 범위에 맞춰 늘려 적었음. 칩 중심의 동서 오프셋은 전역 칩 격자 열의 홀짝으로 갈림(짝수 열 -0.125, 홀수 열 +0.390 MS px, 차이 0.515 MS px). 칩별 측정값을 쓰지 않는 기하 규칙으로 정정: 동서 화소를 4× PS로 바꾸고 홀수 열 칩의 원점을 −2 PS px 옮김. 정정 후 잔차 IQR 폭은 0.106 MS px, 0.5 LR px를 넘는 블록은 168개 중 9개에서 6개로 감소(모두 train, 모두 남북 오프셋 때문)([scripts/diag/g5_phase.py](scripts/diag/g5_phase.py), [scripts/diag/g5_rule_sim.py](scripts/diag/g5_rule_sim.py), [results/figures/g5_before_after/](results/figures/g5_before_after/))
+- **남북 잔차는 보정하지 않음.** LR 내용이 HR보다 북쪽에 있음. 블록 ECC 중앙값 -0.265 LR px(IQR -0.345 ~ -0.199), 약 0.3 m이고 지역 전체에서 부호가 같음. 남북 화소 크기 가설을 적용하면 0.5 LR px를 넘는 블록이 168개 중 6개에서 69개로 오히려 늘어 적용하지 않음. 원인은 확인하지 못함. test 블록의 최대 오프셋은 0.496 LR px로 기준 0.5에 가까움([results/figures/g5_offset_map.png](results/figures/g5_offset_map.png))
+- **약한 기준선은 모든 이득을 부풀림.** LR 탐지기가 덜 학습됐는지를 미리 적어 둔 기준으로 검사했고 기준을 넘어 두 탐지기를 200에폭으로 다시 학습(위 '방법 상세')
 
-**Gain over bicubic interpolation (S0).** Against S0 rather than path 1, S3, S4, S6 and S7 are better and S1 and S2 are worse. This does not change the main verdicts, because S0 itself is harmful against path 1.
+</details>
+
+<details>
+<summary><b>사후 분석 (주 결론 아님)</b></summary>
+
+test 결과를 본 뒤에 요청받아 추가한 분석. 고정한 탐지기와 평가 설정을 그대로 쓰고 결과는 [results/posthoc/](results/posthoc/)에 따로 저장함. [results/summary.csv](results/summary.csv)와 위 판정은 바꾸지 않음. 신뢰구간은 같은 블록 bootstrap 재표본으로 구함(주 결과의 AP50과 신뢰구간이 그대로 재현되는지 확인).
+
+**bicubic 보간(S0) 대비 이득.** 경로 1 대신 S0를 기준으로 하면 S3, S4, S6, S7은 better, S1과 S2는 worse. S0 자체가 경로 1 대비 harmful이라 주 판정은 바뀌지 않음.
 
 <!-- BEGIN:ph_s0 -->
 | method | AP50_geo [95% CI] | AP50 − S0 [95% CI] | verdict |
@@ -271,7 +271,7 @@ These analyses were requested after the test results had been seen. They reuse t
 | S3_color | 0.713 [0.690, 0.738] | +0.044 [+0.029, +0.061] | better |
 <!-- END:ph_s0 -->
 
-**Colour-correction control.** A per-band linear map (gain, offset) from LR 8-bit values to HR 8-bit values (4×4 mean) was fitted by least squares on train-block pixels inside the evaluation mask and applied to S0 and S3 to create S0_color and S3_color.
+**색 보정 대조군.** LR 8비트 값을 HR 8비트 값(4×4 평균)으로 옮기는 밴드별 선형 변환(gain, offset)을 train 블록 평가 마스크 안 화소에서 최소제곱으로 맞추고 S0와 S3 출력에 적용해 S0_color와 S3_color를 만듦.
 
 <!-- BEGIN:ph_colorfit -->
 | band | gain | offset | R² |
@@ -292,9 +292,9 @@ These analyses were requested after the test results had been seen. They reuse t
 | S3_color | 0.713 [0.690, 0.738] | S3_realesrnet_x4plus | 0.716 | -0.003 [-0.009, +0.004] | inconclusive |
 <!-- END:ph_color -->
 
-The global linear colour shift did not help: S0_color is worse than S0, and S3_color is inconclusive against S3. Both stay below S6, by -0.151 and -0.095 with CIs that exclude 0. The S6 gain is therefore not explained by a global linear color shift. This control does not show where the S6 gain comes from, and non-linear or local colour differences were not tested.
+전역 선형 색 변환은 도움이 되지 않음. S0_color는 S0보다 나쁘고 S3_color는 S3 대비 inconclusive. 둘 다 S6보다 각각 -0.151, -0.095 낮고 신뢰구간이 0을 포함하지 않음. S6의 이득은 전역 선형 색 변환으로 설명되지 않음(not explained by a global linear color shift). 이 대조군만으로는 S6 이득의 출처를 알 수 없고 비선형이나 국소적인 색 차이는 검증하지 않음.
 
-**Recall by area, false positives and prediction counts at the operating confidence.**
+**운영 conf에서 면적 구간별 재현율, 거짓 양성, 예측 수.**
 
 <!-- BEGIN:ph_area -->
 | method | conf | <50 m² | 50–150 m² | 150–400 m² | >400 m² | FP | predictions | FP ratio |
@@ -313,11 +313,11 @@ The global linear colour shift did not help: S0_color is worse than S0, and S3_c
 | S3_color | 0.503 | 0.077 [0.055, 0.100] | 0.516 [0.435, 0.594] | 0.836 [0.801, 0.871] | 0.758 [0.610, 0.852] | 407 | 3113 | 0.131 |
 <!-- END:ph_area -->
 
-- S6 recall for buildings under 50 m² is 0.283. Every other SR method is at or below 0.088, and HR is at 0.427
-- S7 (OSEDiff) has the most false positives (763) and the highest FP ratio (0.204). S4 follows with an FP ratio of 0.172; HR has 0.139
-- **Fewer predictions from public SR at a fixed confidence.** At the D_HR operating confidence (0.503), D_HR gives 4,202 predictions on HR and 4,046 on S6, but only 2,535, 2,303 and 2,606 on S0, S1 and S2. The low FP counts of the interpolators (290, 268) come from this drop in prediction count, not from a cleaner output: their FP ratios (0.114, 0.116) are close to HR, while their recall drops in every bin above 50 m². Re-calibrating the confidence per SR method was not done, because it would require val SR outputs and would change the frozen settings
+- 50 m² 미만 건물 재현율은 S6가 0.283. 다른 SR 방법은 모두 0.088 이하이고 HR은 0.427
+- 거짓 양성은 S7(OSEDiff)이 763개로 가장 많고 FP 비율도 0.204로 가장 높음. S4가 FP 비율 0.172로 그다음, HR은 0.139
+- **고정 conf에서 공개 SR의 예측 수 감소.** D_HR 운영 conf(0.503)에서 D_HR은 HR에서 4,202개, S6에서 4,046개를 예측하지만 S0, S1, S2에서는 2,535, 2,303, 2,606개에 그침. 보간 방법의 FP 수가 적은 것(290, 268)은 출력이 깨끗해서가 아니라 예측 수가 줄어서임. FP 비율(0.114, 0.116)은 HR과 비슷하고 재현율은 50 m² 이상 모든 구간에서 떨어짐. SR 방법별 conf 재보정은 val SR 출력이 필요하고 고정한 설정을 바꾸게 되어 하지 않음
 
-**Spearman without S6.** S6 is best on both PSNR and AP50_geo, so it alone can drive the correlation.
+**S6를 뺀 Spearman 상관.** S6는 PSNR과 AP50_geo가 모두 가장 높아 혼자서 상관을 끌어올릴 수 있음.
 
 <!-- BEGIN:ph_spearman -->
 | metric | set | ρ | p |
@@ -332,49 +332,49 @@ The global linear colour shift did not help: S0_color is worse than S0, and S3_c
 | edge_precision | excl. S6 (n=7) | 0.464 | 0.294 |
 <!-- END:ph_spearman -->
 
-Without S6, PSNR and SSIM have almost no rank correlation with AP50_geo (ρ 0.071 and 0.000). LPIPS keeps a weak trend (n=7, p=0.094). With 7 or 8 methods these correlations are imprecise.
+S6를 빼면 PSNR과 SSIM은 AP50_geo와 순위 상관이 거의 없음(ρ 0.071, 0.000). LPIPS는 약한 경향(n=7, p=0.094)이 남음. 방법이 7개나 8개뿐이라 이 상관들은 정밀하지 않음.
 
-An offline viewer of all 96 test tiles (per-tile detections, |SR−HR|, Canny edges, before/after slider) is generated by `run.py report_viewer` into `results/report/` (not committed because of its size). The tile-level F1 values in the viewer are for reference only; the official metrics are in [results/summary.csv](results/summary.csv).
-
-</details>
-
-<details>
-<summary><b>Relation to prior work</b></summary>
-
-SR papers usually rank models by PSNR, SSIM or LPIPS. What matters to a downstream user is whether running SR before an existing analysis model gives better maps than analysing the original data directly. This experiment answers that for one task, rotated building detection.
-
-- **Shermeyer & Van Etten 2019** ([arXiv:1812.04098](https://arxiv.org/abs/1812.04098), EarthVision): super-resolved satellite imagery with VDSR and a random-forest method at ×2, ×4 and ×8 and measured object detection. The largest benefit came from going 30 cm to 15 cm, with smaller benefits at coarser resolutions. Their detectors were trained on each resolution and on SR output, so this experiment differs in three ways: the LR input is a real sensor product rather than a resampled image, the detector is trained once on HR and kept fixed, and the objects are buildings
-- **GeoSR-Bench** ([arXiv:2605.00310](https://arxiv.org/abs/2605.00310)): benchmarks 9 SR models on co-located multi-platform image pairs, evaluating downstream tasks (land-cover segmentation, infrastructure mapping, biophysical variable estimation) alongside perceptual quality, and reports that gains on fidelity metrics often do not carry over to downstream tasks. This repository is a smaller, single-scene case study with the same motivation (one city, one sensor pair, one task, block-level bootstrap CIs, settings frozen before the test evaluation)
+test 타일 96장 전체를 보는 오프라인 뷰어(타일별 탐지, |SR−HR|, Canny 엣지, 전후 비교 슬라이더)는 `run.py report_viewer`로 `results/report/`에 만듦(용량이 커서 커밋하지 않음). 뷰어의 타일 단위 F1은 참고값이고 공식 지표는 [results/summary.csv](results/summary.csv).
 
 </details>
 
 <details>
-<summary><b>Limitations</b></summary>
+<summary><b>선행 연구와의 관계</b></summary>
 
-- **Single city and single acquisition.** One city (Las Vegas), one WorldView-3 acquisition, only part of the AOI (1,168 chips), one class (building), one scale (×4)
-- **HR is a pan-sharpened product.** The reference is derived from the same acquisition's PAN and MS bands, so it is not an independent 0.3 m measurement. HR and LR also differ in colour as products, each with its own percentile stretch
-- **Fixed detector.** Every result of path 2 holds only for a detector trained on HR and kept fixed. With one detector (YOLO26s-OBB) trained on pan-sharpened texture, the experiment cannot separate "SR restores information" from "SR output resembles the pan-sharpened texture the detector was trained on". Training a detector on each SR output was not done
-- **Colour control.** Only a global per-band linear colour correction was tested (post-hoc)
-- **Few methods.** With 8 SR methods (7 without S6), the Spearman correlations have low reliability
-- **S6 generalisation.** Fine-tuned on MS–PS pairs from train blocks of the same city and acquisition. Generalisation to other areas or sensors was not tested
-- **SD2.1-base mirror.** S7 depends on SD2.1-base, downloaded from the personal mirror linked in the OSEDiff README (Manojb/stable-diffusion-2-1-base, commit in [third_party/VERSIONS.md](third_party/VERSIONS.md)). It was not verified to be identical to the stabilityai original, which was not accessible
-- **Training degradation mismatch.** The public SR models were trained on synthetic or other-domain degradations, not on real MS characteristics. For example, the MS bands contain values at the 11-bit ceiling
-- **Registration.** The uncorrected north–south offset of about 0.3 m remains in the comparison between path 1 and path 2
-- **Box shape.** GT and predictions are compared as rotated rectangles. For L- or U-shaped buildings the rectangle is larger than the roof, so IoU matching can differ from the true outline. Area bins use the polygon area
-- **Calibration.** The operating confidence is calibrated on HR val and applied unchanged to SR outputs (see the prediction-count finding in the post-hoc analysis)
-- **Excluded methods.** AdcSR (S8) was disabled in the config (`enable_adcsr: false`). Anime-domain models such as RealESRGAN_x4plus_anime_6B were excluded because their training domain differs
+SR 논문은 보통 PSNR, SSIM, LPIPS로 모델 순위를 매김. 실제로 결과를 쓰는 사람에게 중요한 것은 기존 분석 모델 앞에 SR을 넣었을 때 원본 자료로 바로 분석할 때보다 더 나은 지도가 나오는가임. 이 실험은 회전 건물 탐지라는 과제 하나에서 이 질문에 답함.
+
+- **Shermeyer & Van Etten 2019**([arXiv:1812.04098](https://arxiv.org/abs/1812.04098), EarthVision): 위성 영상을 VDSR과 랜덤 포레스트 방법으로 ×2, ×4, ×8 초해상도한 뒤 객체 탐지 성능을 측정. 30 cm에서 15 cm로 올릴 때 이득이 가장 컸고 해상도가 거칠수록 이득이 작았음. 해상도별 영상과 SR 출력마다 탐지기를 학습한 연구라 이 실험과 세 가지가 다름. 이 실험의 LR 입력은 리샘플한 영상이 아니라 실제 센서 제품이고 탐지기는 HR로 한 번만 학습해 고정하며 대상은 건물
+- **GeoSR-Bench**([arXiv:2605.00310](https://arxiv.org/abs/2605.00310)): 같은 위치를 여러 플랫폼이 촬영한 영상 쌍에서 SR 모델 9개를 비교. 지각 화질과 함께 다운스트림 과제(토지피복 분할, 기반시설 지도화, 생물물리 변수 추정)를 평가하며 충실도 지표의 향상이 다운스트림 과제로 이어지지 않는 경우가 많다고 보고. 이 저장소는 같은 문제의식의 더 작은 단일 장면 사례 연구(도시 하나, 센서 쌍 하나, 과제 하나, 블록 단위 bootstrap 신뢰구간, test 평가 전 설정 고정)
 
 </details>
 
 <details>
-<summary><b>Reproduce</b></summary>
+<summary><b>한계</b></summary>
 
-- **Hardware:** 1× RTX 4090 (24,564 MiB), a cgroup limit of 13.6 CPU cores and 62 GB RAM, and a RunPod network volume at `/workspace`
-- **Environments:** 3 conda environments (Miniforge at `/workspace/miniforge3`), split because of the pinned official versions ([docs/env_matrix.md](docs/env_matrix.md), [docs/env_report.md](docs/env_report.md))
-  - `geo`: Python 3.12, GDAL / rasterio / geopandas / OpenCV / Ultralytics / evaluation, and `run.py`
+- **단일 도시, 단일 촬영.** 도시 하나(라스베이거스), WorldView-3 촬영 하나, AOI 일부(칩 1,168장), 클래스 하나(건물), 배율 하나(×4)
+- **HR은 팬샤프닝 산출물.** 같은 촬영의 PAN과 MS 밴드에서 만든 정답이라 독립적인 0.3 m 측정이 아님. HR과 LR은 제품 간 색 차이도 있고 각자 다른 백분위 스트레치를 씀
+- **고정 탐지기.** 경로 2의 모든 결과는 HR로 학습해 고정한 탐지기를 쓸 때만 성립. 팬샤프닝 질감으로 학습한 탐지기(YOLO26s-OBB) 하나만 써서 "SR이 정보를 복원했다"와 "SR 출력이 탐지기가 학습한 팬샤프닝 질감과 닮았다"를 구분하지 못함. SR 출력마다 탐지기를 학습하는 실험은 하지 않음
+- **색 보정 대조군.** 전역 밴드별 선형 색 보정만 검증(사후 분석)
+- **적은 방법 수.** SR 방법이 8개(S6를 빼면 7개)라 Spearman 상관의 신뢰도가 낮음
+- **S6 일반화.** 같은 도시, 같은 촬영의 train 블록 MS–PS 쌍으로 파인튜닝. 다른 지역이나 센서로의 일반화는 검증하지 않음
+- **SD2.1-base 미러.** S7이 쓰는 SD2.1-base를 OSEDiff README가 링크한 개인 미러(Manojb/stable-diffusion-2-1-base, 커밋은 [third_party/VERSIONS.md](third_party/VERSIONS.md))에서 받음. 접근할 수 없었던 stabilityai 원본과 같은지는 검증하지 못함
+- **학습 열화와의 차이.** 공개 SR 모델은 합성 열화나 다른 도메인으로 학습돼 실제 MS의 특성을 보지 않았음. 예를 들어 MS 밴드에는 11비트 상한에 포화된 값이 있음
+- **정합.** 보정하지 않은 약 0.3 m 남북 오프셋이 경로 1과 경로 2 비교에 그대로 남음
+- **상자 모양.** 정답과 예측을 회전 사각형으로 비교. L자나 ㄷ자 건물은 사각형이 지붕보다 넓어 IoU 매칭이 실제 윤곽과 다를 수 있음. 면적 구간은 폴리곤 면적 기준
+- **conf 보정.** 운영 conf는 HR val에서 정해 SR 출력에 그대로 적용(사후 분석의 예측 수 감소 참고)
+- **제외한 방법.** AdcSR(S8)은 설정에서 끄고(`enable_adcsr: false`) 실행하지 않음. RealESRGAN_x4plus_anime_6B 같은 애니메이션용 모델은 학습 도메인이 달라 제외
+
+</details>
+
+<details>
+<summary><b>재현</b></summary>
+
+- **하드웨어:** RTX 4090(24,564 MiB) 1장, cgroup 한도 CPU 13.6코어와 RAM 62 GB, `/workspace`의 RunPod 네트워크 볼륨
+- **환경:** conda 환경 3개(Miniforge, `/workspace/miniforge3`). 공식 고정 버전이 충돌해 나눔([docs/env_matrix.md](docs/env_matrix.md), [docs/env_report.md](docs/env_report.md))
+  - `geo`: Python 3.12, GDAL / rasterio / geopandas / OpenCV / Ultralytics / 평가, `run.py`
   - `sr`: Python 3.10, PyTorch 2.1.2, BasicSR, Real-ESRGAN, SwinIR, ResShift
   - `osediff`: Python 3.10, PyTorch 2.0.1, OSEDiff
-- **Files:** environment and lock files in [env/](env/); external repositories and their commits in [third_party/VERSIONS.md](third_party/VERSIONS.md)
+- **파일:** 환경 파일과 잠금 파일은 [env/](env/), 외부 저장소와 커밋은 [third_party/VERSIONS.md](third_party/VERSIONS.md)
 
 ```bash
 bash scripts/setup_envs.sh                       # environments, third_party clones, weights (idempotent)
@@ -383,9 +383,9 @@ $P run.py data raster tiles_labels train_det det_calib sr eval   # main pipeline
 $P run.py posthoc report_viewer report                           # post-hoc, viewer, README tables and checks
 ```
 
-All paths derive from `root` in [configs/default.yaml](configs/default.yaml). Every command that was actually run, including the sensitivity run and the 100-epoch models kept for reference, is in [RUNBOOK.md](RUNBOOK.md).
+모든 경로는 [configs/default.yaml](configs/default.yaml)의 `root` 하나에서 만듦. 민감도 실행과 참고용으로 남긴 100에폭 모델까지 실제로 실행한 명령은 모두 [RUNBOOK.md](RUNBOOK.md)에 있음.
 
-Wall time per stage (last full run, from `logs/timing.csv`; environment setup and downloads of weights not included):
+단계별 소요 시간(마지막 전체 실행, `logs/timing.csv` 기준, 환경 설치와 가중치 다운로드 제외):
 
 <!-- BEGIN:timing -->
 | stage | minutes | max mean GPU util % | max RAM GB |
@@ -402,23 +402,23 @@ Wall time per stage (last full run, from `logs/timing.csv`; environment setup an
 | total | 317.6 (5.29 h) |  |  |
 <!-- END:timing -->
 
-Cost is the total above multiplied by the hourly price of a single-RTX 4090 pod; the price was not recorded in this repository. S6 fine-tuning is the largest single item.
+비용은 위 합계에 RTX 4090 한 장짜리 파드의 시간당 가격을 곱한 값(가격은 이 저장소에 기록하지 않음). 단일 항목으로는 S6 파인튜닝이 가장 큼.
 
 </details>
 
-## License and attribution
+## 라이선스와 출처
 
-- **Data:** SpaceNet 2 building dataset (AOI_2_Vegas), SpaceNet on Amazon Web Services (AWS), licensed under CC BY-SA 4.0 (https://registry.opendata.aws/spacenet/). Derived rasters and labels in this repository fall under the same license
-- **Code of this repository:** no license file has been added yet
-- **Models and code used:**
+- **데이터:** SpaceNet 2 건물 데이터셋(AOI_2_Vegas), SpaceNet on Amazon Web Services (AWS), CC BY-SA 4.0 라이선스(https://registry.opendata.aws/spacenet/). 이 저장소에서 만든 래스터와 라벨도 같은 라이선스를 따름
+- **이 저장소의 코드:** 아직 라이선스 파일을 두지 않음
+- **사용한 모델과 코드:**
 
-  | Component | License | Note |
+  | 구성 요소 | 라이선스 | 비고 |
   |---|---|---|
-  | Ultralytics YOLO26 (and `yolo26s-obb.pt`) | AGPL-3.0 | Pretrained on DOTA; check the DOTA dataset terms before any commercial use |
+  | Ultralytics YOLO26 (와 `yolo26s-obb.pt`) | AGPL-3.0 | DOTA로 사전학습됨. 상업적으로 쓰기 전 DOTA 데이터셋 조건 확인 필요 |
   | SwinIR | Apache-2.0 | |
   | BasicSR | Apache-2.0 | |
-  | Real-ESRGAN (S3, S4, S6 base) | BSD-3-Clause | |
-  | ResShift (S5) | NTU S-Lab License 1.0 | **Non-commercial use only** |
+  | Real-ESRGAN (S3, S4, S6 기반) | BSD-3-Clause | |
+  | ResShift (S5) | NTU S-Lab License 1.0 | **비상업적 사용만 허용** |
   | OSEDiff (S7) | Apache-2.0 | |
-  | Stable Diffusion 2.1-base (S7 dependency) | CreativeML Open RAIL++-M (per the stabilityai model card) | Use restrictions apply; mirror not verified against the original |
-  | RAM / DAPE (S7 dependency) | See the OSEDiff and recognize-anything repositories | |
+  | Stable Diffusion 2.1-base (S7 의존 모델) | CreativeML Open RAIL++-M (stabilityai 모델 카드 기준) | 사용 제한 조항 있음. 미러와 원본의 동일성 미검증 |
+  | RAM / DAPE (S7 의존 모델) | OSEDiff와 recognize-anything 저장소 참고 | |

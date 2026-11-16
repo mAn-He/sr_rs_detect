@@ -75,7 +75,7 @@ P=/workspace/miniforge3/envs/geo/bin/python
 T=$(date +%Y%m%d_%H%M%S); nohup $P run.py posthoc report_viewer > logs/posthoc_viewer_$T.log 2>&1 &
 # 그림 (g) gain 포리스트, (h) LPIPS vs AP50 추가(summary.csv·spearman.csv는 같은 값으로 다시 쓰임)
 PROJ_DATA=/workspace/miniforge3/envs/geo/share/proj $P src/report.py > logs/report_figs_$(date +%Y%m%d_%H%M%S).log 2>&1
-# README.md·README.ko.md 결과표 갱신과 수치·표·그림·링크 대조 → docs/code_check.md
+# README.md(한국어)·README_eng.md(영어) 결과표 갱신과 수치·표·그림·링크 대조 → docs/code_check.md
 $P run.py report > logs/report_readme_$(date +%Y%m%d_%H%M%S).log 2>&1
 B=/workspace/miniforge3/envs/geo/bin
 $B/ruff check . --exclude third_party
