@@ -1,34 +1,61 @@
-# rs-sr-detect: does ×4 super-resolution of real multispectral imagery help a fixed building detector?
+# Super Resolution × Building Detection
 
 Korean: [README.ko.md](README.ko.md)
 
-**Short answer: only when the SR model is fine-tuned on real sensor pairs.** Eight super-resolution (SR) methods were applied to real 1.2 m WorldView-3 multispectral imagery and judged by building-detection accuracy, not by PSNR. With a detector trained on HR and kept fixed, Real-ESRGAN fine-tuned on SpaceNet MS–PS pairs was the only method that beat detecting on the low-resolution input directly. Every public SR model, including both diffusion models, was harmful or inconclusive.
+- Tests whether ×4 super-resolution of real low-resolution satellite imagery (1.2 m) improves building detection
+- A proxy for having only 1.2 m-class imagery without a PAN band. Uses real multispectral (LR) and pan-sharpened (HR) images of the same WorldView-3 acquisition from SpaceNet 2 Las Vegas, with no synthetic downsampling
+- Compares SR image-quality metrics (PSNR, SSIM, LPIPS) with performance on the downstream task (building detection)
+
+## Key results
+
+- **Only SR fine-tuned on real sensor pairs helped.** AP50_geo rose from 0.731 on the raw LR to 0.808, recovering 68% of the gap to HR (0.845)
+- **None of the 7 public SR models, diffusion included, beat detecting on LR directly.** harmful 6, inconclusive 1
+- **The effect is largest on small buildings.** Recall under 50 m² went from 0.027 to 0.283; public SR stayed at or below 0.088
+- **PSNR did not predict detection performance.** Rank correlation ρ 0.381 (p 0.352), and 0.071 without the fine-tuned model
+- **Generative SR produced more false positives.** OSEDiff false-positive ratio 0.204, against 0.139 on HR
+- **Conditions:** one city, one acquisition, a detector trained on HR and kept fixed
+
+![gain forest plot](results/figures/report_g_gain_forest.png)
+
+*AP50_geo gain of each SR model over detecting on LR directly, with block-bootstrap 95% CI. S0 Bicubic, S1 Lanczos, S2 SwinIR, S3 Real-ESRNet, S4 Real-ESRGAN, S5 ResShift, S6 fine-tuned Real-ESRGAN, S7 OSEDiff.*
+
+## Result images
+
+### Output of each SR model
+
+![SR method grid](results/figures/report_c_method_grid.png)
+
+*HR, LR and the 8 SR outputs over the same area. Interpolation and regression models (S0–S3) leave edges blurred, while GAN and diffusion models (S4, S5, S7) draw new edges and texture. The fine-tuned model (S6) is closest to the HR roof outlines and colours and also scores best on image quality (PSNR 21.05, LPIPS 0.149).*
+
+### Detections
+
+![qualitative b028_r1c0](results/figures/qualitative_b028_r1c0.png)
+
+![qualitative b132_r0c0](results/figures/qualitative_b132_r0c0.png)
+
+*GT yellow, TP green, FP red. Two 153.6 m test windows with a median building count; geographic matching at the operating confidence.*
+
+### Recall by building size
+
+![recall by area](results/figures/report_b_recall_by_area.png)
+
+*Only S6 is useful in every area bin. S3, S4, S5 and S7 are useful only under 50 m² and harmful in the 50–150 and 150–400 m² bins that the LR detector already handled well.*
+
+## Experimental design
 
 ![rs-sr-detect pipeline](results/figures/pipeline.png)
 
-*Figure 1. Pipeline. Stage 1: a WorldView-3 multispectral image (LR) and the pan-sharpened image of the same acquisition (HR) are co-registered on one UTM grid and split by spatial blocks. Stage 2: the same LR image goes straight to a detector trained on LR (baseline) or through one of 8 super-resolution models to a detector trained on HR, which also runs on the real HR image (upper bound). Stage 3: detections are merged into building polygons and each SR model is compared with the baseline by its AP50 gain and a block-bootstrap 95% CI.*
-
-This repository is a proxy experiment for one situation: only 1.2 m-class imagery without a panchromatic band is available (another satellite, or a product delivered without PAN), and it has to be brought to 0.3 m. SpaceNet 2 (AOI_2_Vegas) provides both products from the same WorldView-3 acquisition. The real 1.2 m multispectral (MS) GeoTIFF is the low-resolution (LR) input, and the 0.3 m pan-sharpened RGB (PS-RGB) is the high-resolution (HR) reference. No synthetic degradation is used, and the scale factor is ×4 only.
-
-## Results at a glance
-
-| Input to the detector | AP50_geo [95% CI] | gain vs LR [95% CI] | Verdict |
-| --- | --- | --- | --- |
-| Real HR, 0.3 m (upper bound) | 0.845 [0.828, 0.861] | – | – |
-| **SR fine-tuned on real MS–PS pairs (S6)** | **0.808 [0.791, 0.825]** | **+0.077 [+0.056, +0.095]** | **useful**, recovers 68% of the gap |
-| LR directly, 1.2 m (path 1 baseline) | 0.731 [0.710, 0.754] | – | – |
-| Best public SR: Real-ESRNet (S3) | 0.716 [0.692, 0.741] | -0.015 [-0.035, +0.003] | inconclusive |
-| One-step diffusion: OSEDiff (S7) | 0.688 [0.662, 0.715] | -0.043 [-0.056, -0.031] | harmful |
-| Bicubic interpolation (S0) | 0.669 [0.639, 0.702] | -0.063 [-0.083, -0.044] | harmful |
-
-- **Small buildings are where SR matters.** For buildings under 50 m², recall rose from 0.027 (LR) to 0.283 (S6). The public SR models stayed at or below 0.088 and lost recall on the 50–400 m² houses that the LR detector already found.
-- **PSNR did not predict usefulness.** The Spearman correlation between PSNR rank and detection rank was 0.381 (p 0.352, n=8), and 0.071 with S6 removed.
-- **Generative SR adds buildings that are not there.** OSEDiff had the highest false-positive ratio, 0.204, against 0.139 on real HR.
-
-All numbers come from [results/summary.csv](results/summary.csv) and [results/posthoc/](results/posthoc). They hold only for this dataset (one city, one acquisition) and for a detector trained on HR and kept fixed.
+| Item | Setting |
+| --- | --- |
+| Data | SpaceNet 2 AOI_2_Vegas, 1,168 chips, 35,265 buildings. MS at 1.2 m as the LR input, PS-RGB at 0.3 m as the HR reference |
+| Registration | Warped with GDAL to a UTM 11N grid on which 1 LR pixel covers exactly 4×4 HR pixels |
+| Split | 576 m spatial blocks, train / val / test = 118 / 26 / 24 blocks |
+| Detectors | Two YOLO26s-OBB models: a baseline trained on LR and a detector trained on HR and kept fixed. Both start from DOTA-pretrained weights |
+| SR | 8 models from 5 families: interpolation (Bicubic, Lanczos), regression (SwinIR, Real-ESRNet), GAN (Real-ESRGAN), diffusion (ResShift, OSEDiff), fine-tuning (Real-ESRGAN trained on real MS–PS pairs) |
+| Verdict | Block-bootstrap 95% CI of the AP50_geo gain (1,000 resamples). Lower bound > 0 is useful, upper bound < 0 is harmful, otherwise inconclusive. Evaluation settings were chosen on val and frozen before test |
 
 <details>
-<summary><b>All 8 SR models, sorted by AP50_geo</b></summary>
+<summary><b>Full results (AP50, recall by area, image quality, sensitivity)</b></summary>
 
 | SR model | Family | AP50_geo [95% CI] | gain vs LR [95% CI] | Verdict |
 | --- | --- | --- | --- | --- |
@@ -40,124 +67,6 @@ All numbers come from [results/summary.csv](results/summary.csv) and [results/po
 | Bicubic (S0) | Interpolation | 0.669 [0.639, 0.702] | -0.063 [-0.083, -0.044] | harmful |
 | Lanczos (S1) | Interpolation | 0.657 [0.623, 0.692] | -0.075 [-0.100, -0.053] | harmful |
 | SwinIR (S2) | Regression | 0.619 [0.586, 0.651] | -0.112 [-0.137, -0.087] | harmful |
-
-Full tables, recall by building size and image-quality metrics are in [Main results](#main-results).
-
-</details>
-
-## Benchmark dataset
-
-**SpaceNet 2, AOI_2_Vegas** is a public building-footprint benchmark built on WorldView-3 imagery of Las Vegas. One WorldView-3 acquisition records a panchromatic (PAN) band and 8 multispectral (MS) bands at the same time. The MS pixels are 4× coarser than the PAN pixels; that is a property of the sensor, not a downsampling step. SpaceNet ships the raw bands and pan-sharpened products, which fuse PAN detail with MS colour.
-
-| SpaceNet 2 folder | Content | Pixel | Used here |
-| --- | --- | --- | --- |
-| PAN | 1 panchromatic band | about 0.3 m | no |
-| MS | 8 bands: Coastal, Blue, Green, Yellow, Red, Red Edge, NIR1, NIR2 | about 1.2 m (163 × 163 px per chip) | **LR input**, bands 5, 3, 2 (Red, Green, Blue) |
-| PS-MS | 8 pan-sharpened bands | about 0.3 m | no |
-| PS-RGB | pan-sharpened Red, Green, Blue | about 0.3 m (650 × 650 px per chip) | **HR reference** |
-| geojson_buildings | building footprint polygons | – | labels |
-
-- **Area.** Each chip covers about 157.8 m × 194.7 m. The 3,850 labelled train chips are scattered between unlabelled test chips, so the densest window of about 8.36 km × 6.81 km was chosen and only its 1,168 train chips were downloaded.
-- **Values.** Both products are 11-bit; each is converted to 8-bit with its own percentile stretch.
-- **Labels and split.** 35,265 buildings, assigned by 576 m spatial blocks to train / val / test: 118 / 26 / 24 blocks with 23,394 / 5,020 / 5,194 buildings.
-- **What "HR" means here.** The HR reference is pan-sharpened, so it is derived from PAN and the same MS bands of the same acquisition. It is the best available 0.3 m colour image, not an independent measurement.
-
-<details>
-<summary><b>Co-registration: what "a common UTM grid" means</b></summary>
-
-- SpaceNet chips use geographic coordinates (EPSG:4326, degrees). At the latitude of Las Vegas a pixel that is square in degrees is not square on the ground: PS-RGB pixels are 0.2427 m × 0.2995 m and MS pixels 0.9677 m × 1.1944 m (east-west × north-south).
-- UTM (Universal Transverse Mercator) is a map projection whose coordinates are in metres. Las Vegas lies in zone 11N (EPSG:32611).
-- Both products were warped with GDAL to UTM 11N on aligned grids: HR at 0.3 m and LR at 1.2 m from the same origin, so one LR pixel covers exactly 4 × 4 HR pixels (checked by assertion). HR, LR, every SR output and the labels then share pixel positions and map coordinates.
-- Before warping, the MS chip metadata was corrected for the 650 / 4 = 162.5 px chip phase, and alignment was checked per block with ECC ([Engineering findings](#engineering-findings)).
-
-</details>
-
-## What was done
-
-- **A real sensor pair, not synthetic downsampling.** The LR input is the 1.2 m multispectral product and the reference is the 0.3 m pan-sharpened product of the same WorldView-3 acquisition (SpaceNet 2, Las Vegas, 1,168 chips).
-- **A georeferenced GDAL and OpenCV pipeline.** Both products are warped to one UTM grid on which 1 LR pixel covers exactly 4×4 HR pixels. Tile predictions are merged in map coordinates and matched to building footprints there.
-- **Two detectors trained here.** Both use the same architecture and start from the official DOTA-pretrained YOLO26s-OBB weights, with the same seed and epoch budget: one is trained on LR tiles (the baseline), the other on HR tiles. The HR detector is then frozen and applied to the output of each of **8 SR methods from 5 families** (interpolation, regression, GAN, diffusion, domain fine-tuning).
-- **A verdict rule fixed in advance.** A spatial-block bootstrap CI on the AP50 gain decides useful, harmful or inconclusive. All thresholds were set on val before a single test run ([docs/frozen_eval.md](docs/frozen_eval.md)).
-
-<details>
-<summary><b>How the fine-tuned SR model (S6) was trained, and how it compares with the same model before fine-tuning</b></summary>
-
-S6 is Real-ESRGAN fine-tuned in this project on real image pairs. It starts from the same public weights as S4, so S6 − S4 isolates the effect of fine-tuning. Source: [results/s6_finetune.json](results/s6_finetune.json), [results/S6_realesrgan_ft_spacenet.yml](results/S6_realesrgan_ft_spacenet.yml), [docs/decisions.md](docs/decisions.md).
-
-| Item | Setting |
-| --- | --- |
-| Starting weights | official RealESRGAN_x4plus (generator) and RealESRGAN_x4plus_netD (U-Net discriminator) |
-| Recipe | official Real-ESRGAN paired-data fine-tuning config, with weight paths, data paths, iterations and milestones set for this run |
-| Training data | 433 train-block tile pairs: real multispectral 1.2 m (LR) with pan-sharpened 0.3 m (HR) of the same place |
-| Losses | L1 pixel loss, perceptual loss, GAN loss |
-| Optimiser | Adam, learning rate 1e-4, batch 12, random 256 px HR crops |
-| Iterations | 23,600 of the official 400,000 (5.9%), from a measured 0.4117 s per iteration within 3 h × 0.9 |
-| Time | 9,481 s on one RTX 4090 |
-| Checkpoint | the last one; the largest weight change from the start was 0.237, so training did change the model |
-| Leakage control | trained on train blocks only and evaluated on separate test blocks |
-
-| Metric (test blocks) | S4, public weights | S6, fine-tuned |
-| --- | --- | --- |
-| PSNR | 19.09 | 21.05 |
-| SSIM | 0.549 | 0.637 |
-| LPIPS (lower is better) | 0.312 | 0.149 |
-| AP50_geo [95% CI] | 0.704 [0.679, 0.728] | 0.808 [0.791, 0.825] |
-| Recall, buildings under 50 m² | 0.088 | 0.283 |
-| False-positive ratio | 0.172 | 0.147 |
-
-The two AP50_geo intervals do not overlap. The comparison holds for a detector trained on HR and kept fixed.
-
-</details>
-
-## Problems solved along the way
-
-- **The data had holes.** SpaceNet interleaves train and test chips, so no contiguous labelled area exists. Chip footprints became the valid mask, holes were filled with a neutral colour, and a 9.6 m border was excluded from evaluation. The method ranking was the same at 0, 8 and 16 LR px insets.
-- **The registration check was wrong before the data was.** 110 of 168 blocks first failed alignment. A synthetic-shift test showed that OpenCV `phaseCorrelate` returns exactly +0.5 px on odd padded sizes. After the measurement was fixed, the remaining offset was traced to a 650 / 4 = 162.5 px chip phase and corrected by a geometric rule, not by per-chip fitting.
-- **A weak baseline would inflate every gain.** Whether the LR detector was under-trained was tested against a threshold written down in advance. It was met, so both detectors were retrained at 200 epochs.
-
-Details: [Method](#method) · [Main results](#main-results) · [Post-hoc analysis](#post-hoc-analysis-post-hoc-not-a-primary-result) · [Engineering findings](#engineering-findings) · [Limitations](#limitations) · [Reproduce](#reproduce)
-
-## Question and motivation
-
-SR papers usually rank models by PSNR, SSIM or LPIPS. A downstream user asks a different question: does running SR before an existing analysis model give better maps than running the analysis on the original data? This experiment answers it for one task, rotated building detection. The primary metric is geographic AP50 after merging tiles (AP50_geo). Image-quality metrics are used only to explain the detection results.
-
-- **Shermeyer & Van Etten 2019** ([arXiv:1812.04098](https://arxiv.org/abs/1812.04098), EarthVision) super-resolved satellite imagery with VDSR and a random-forest method at ×2, ×4 and ×8 and measured object detection. They found the largest benefit when going from 30 cm to 15 cm and smaller benefits at coarser resolutions. Their detectors were trained on each resolution and on SR output. This experiment differs in three ways: the LR input is a real sensor product rather than a resampled image, the detector is trained once on HR and kept fixed, and the objects are buildings.
-- **GeoSR-Bench** ([arXiv:2605.00310](https://arxiv.org/abs/2605.00310)) benchmarks 9 SR models on co-located multi-platform image pairs, evaluating downstream tasks (land-cover segmentation, infrastructure mapping, biophysical variable estimation) alongside perceptual quality. It reports that gains on fidelity metrics often do not carry over to downstream tasks. This repository is a smaller, single-scene case study with the same motivation: one city, one sensor pair, one task, with block-level bootstrap confidence intervals and settings frozen before the test evaluation.
-
-## Data and setup
-
-- **Source:** SpaceNet 2, AOI_2_Vegas, train split (`s3://spacenet-dataset/spacenet/SN2_buildings/train/AOI_2_Vegas/`). Only the PS-RGB, MS and building GeoJSON of 1,168 chips were downloaded. Details are in [docs/data_report.md](docs/data_report.md).
-- **LR input:** MS bands 5, 3, 2 (Red, Green, Blue of the WorldView-3 8-band order). The band choice was checked by correlating each MS band with PS-RGB averaged to the MS grid. The bands are warped to a 1.2 m UTM grid (EPSG:32611).
-- **HR reference:** PS-RGB warped to a 0.3 m grid aligned so that 1 LR pixel covers exactly 4×4 HR pixels (asserted). **PS-RGB is a pan-sharpened product** made from the PAN and MS bands of the same acquisition, not an independent 0.3 m measurement.
-- **8-bit conversion:** each product gets its own 2–98 percentile stretch per band, computed on train blocks only.
-- **Spatial split:** 576 m blocks (LR 480 px) assigned to train / val / test by building count. The result was 118 / 26 / 24 blocks with 23,394 / 5,020 / 5,194 buildings. Tiles are 307.2 m (HR 1024 px, LR 256 px), 2×2 per block, and never cross a block boundary.
-- **NoData and evaluation zone:** SpaceNet train and test chips are spatially interleaved, so the downloaded window has holes. The valid mask is the union of chip footprints, not pixel values. Invalid pixels are filled with the train-block mean colour, and every SR output is overwritten with the same fill. The evaluation zone is the footprint shrunk inward by 9.6 m (8 LR px). Ground truth and predictions with at least 50% of their area outside this zone are dropped from TP, FP and FN. The 0 / 8 / 16 LR px sensitivity is reported below.
-
-## Method
-
-- **Path 1 (lower bound):** D_LR, a YOLO26s-OBB trained on LR tiles (imgsz 256), detects on LR.
-- **Path 2:** D_HR, the same architecture trained on HR tiles (imgsz 1024), detects on each SR output. D_HR is never retrained for an SR method. Every conclusion therefore carries the condition "with a detector trained on HR and kept fixed".
-- **Upper bound:** D_HR on HR.
-- **SR methods (×4, same 8-bit LR tiles as input):**
-
-  | ID | Category | Method |
-  |---|---|---|
-  | S0 / S1 | Interpolation | GDAL cubic / lanczos |
-  | S2 | Regression | SwinIR classical ×4 (DF2K) |
-  | S3 | Regression | Real-ESRNet x4plus |
-  | S4 | GAN | Real-ESRGAN x4plus |
-  | S5 | Diffusion (efficient) | ResShift v3 |
-  | S6 | Domain fine-tuning | Real-ESRGAN fine-tuned on train-block MS–PS pairs |
-  | S7 | One-step diffusion | OSEDiff |
-
-  S6 used the official paired-data fine-tuning config, starting from RealESRGAN_x4plus. It ran 23,600 iterations, limited by a measured 0.4117 s/iter and a 3 h budget. S6 − S4 is therefore the effect of fine-tuning.
-- **Merging and matching:** tile predictions are merged with `cv2.dnn.NMSBoxesRotated` per block, at IoU 0.5. Predictions are then matched to GT (minimum rotated rectangle of each footprint) in UTM at rotated IoU ≥ 0.5.
-- **Metrics:** AP50_geo uses predictions with conf ≥ 0.001 and max_det 3000. Recall by area and false positives use an operating confidence chosen on val by maximum F1: 0.503 for D_HR (also applied to every SR row) and 0.562 for D_LR.
-- **Verdict:** 95% CIs come from a test-block bootstrap (1,000 resamples, seed 0). gain = AP50_geo(path 2) − AP50_geo(path 1), computed on the same resample. A method is **useful** if the gain CI lower bound is above 0, **harmful** if the upper bound is below 0, and **inconclusive** otherwise. recovery = gain / (AP50_geo(HR) − AP50_geo(LR)).
-- **Settings frozen before test:** detector weights (SHA256), max_det, merge IoU, operating confidences, buffer, Canny thresholds and the code commit were recorded in [docs/frozen_eval.md](docs/frozen_eval.md) before the test blocks were evaluated. Everything was chosen on train or val blocks. The later post-hoc rerun is logged in the same file.
-- **200-epoch decision (rule fixed in advance):** the first D_LR ran to the 100-epoch default without early stopping. A separate 200-epoch D_LR was trained under a rule written down before seeing its result: retrain both detectors at 200 epochs if LR val AP50_geo rises by ≥ 0.01. It rose from 0.6619 to 0.6743 (+0.0124), so both detectors were retrained with epochs 200 and patience 20. D_HR early-stopped at 86 epochs; D_LR ran all 200. Best weights were chosen on val by the Ultralytics default fitness, mAP50-95 ([docs/decisions.md](docs/decisions.md)).
-
-## Main results
 
 Test blocks, 4,426 GT buildings in the evaluation zone, buffer 8 LR px. Source: [results/summary.csv](results/summary.csv).
 
@@ -176,8 +85,6 @@ Test blocks, 4,426 GT buildings in the evaluation zone, buffer 8 LR px. Source: 
 | S7_osediff_x4 | path2 (D_HR on SR) | 0.688 [0.662, 0.715] | -0.043 [-0.056, -0.031] | -0.38 | **harmful** | 763 |
 <!-- END:main -->
 
-![gain forest plot](results/figures/report_g_gain_forest.png)
-
 Recall by building area (operating confidence) and its gain verdict against path 1:
 
 <!-- BEGIN:recall -->
@@ -194,8 +101,6 @@ Recall by building area (operating confidence) and its gain verdict against path
 | S6_realesrgan_ft_spacenet | 0.283 [0.232, 0.330] | 0.753 [0.682, 0.812] | 0.971 [0.958, 0.982] | 0.855 [0.729, 0.938] | useful / useful / useful / useful |
 | S7_osediff_x4 | 0.078 [0.059, 0.096] | 0.618 [0.523, 0.698] | 0.908 [0.878, 0.932] | 0.774 [0.636, 0.856] | useful / harmful / harmful / inconclusive |
 <!-- END:recall -->
-
-![recall by area](results/figures/report_b_recall_by_area.png)
 
 Image-quality metrics (evaluation mask) and processing time (model loading excluded; loading time listed separately):
 
@@ -224,10 +129,6 @@ Spearman correlation between the rank of each quality metric and the AP50_geo ra
 | edge_recall | 0.214 | 0.610 | 8 |
 <!-- END:spearman -->
 
-| PSNR vs AP50_geo | LPIPS vs AP50_geo |
-|---|---|
-| ![PSNR vs AP50](results/figures/report_a_psnr_vs_ap50.png) | ![LPIPS vs AP50](results/figures/report_h_lpips_vs_ap50.png) |
-
 Buffer sensitivity (evaluation-zone inset 0 / 8 / 16 LR px):
 
 <!-- BEGIN:buffer -->
@@ -245,14 +146,112 @@ Buffer sensitivity (evaluation-zone inset 0 / 8 / 16 LR px):
 | S7_osediff_x4 | 0.669 / -0.048 / harmful | 0.688 / -0.043 / harmful | 0.689 / -0.044 / harmful |
 <!-- END:buffer -->
 
-Reading of the main results, with a detector trained on HR and kept fixed, on this dataset:
+- S6 is the only useful method, for AP50_geo and in every area bin. Its gain for buildings under 50 m² is +0.256 [+0.213, +0.298]
+- S3, S4, S5 and S7 are useful only for buildings under 50 m² and harmful in the 50–150 and 150–400 m² bins. Their overall AP50_geo gain is negative or inconclusive
+- The ranking of methods is the same at all 3 buffer widths. Only S3 changes verdict: harmful at 0 and 16 LR px, inconclusive at 8 LR px
+- Time: S6 costs 1.164 s/km² of SR plus 29.07 s of model loading, on the same scale as D_HR detection on S6 output (0.459 s/km²). The diffusion models S5 and S7 take 14.901 and 16.150 s/km² and are harmful ([results/figures/report_e_time_vs_ap50.png](results/figures/report_e_time_vs_ap50.png))
 
-- S6 is the only useful method, both for AP50_geo and in every area bin. Its gain in buildings under 50 m² is +0.256 [+0.213, +0.298].
-- S3, S4, S5 and S7 are useful only for buildings under 50 m² and harmful in the 50–150 and 150–400 m² bins. Their overall AP50_geo gain is negative or inconclusive.
-- The ranking of methods is the same at all 3 buffer widths. S3 is harmful at 0 and 16 LR px and inconclusive at 8 LR px, so its verdict depends on the buffer.
-- Time: S6 costs 1.164 s/km² of SR plus 29.07 s of model loading. This is on the same scale as D_HR detection (0.459 s/km² on S6 output). The diffusion models S5 and S7 take 14.901 and 16.150 s/km² and are harmful. See also [results/figures/report_e_time_vs_ap50.png](results/figures/report_e_time_vs_ap50.png).
+</details>
 
-## Post-hoc analysis (post-hoc, not a primary result)
+<details>
+<summary><b>Dataset and preprocessing (SpaceNet 2, common UTM grid)</b></summary>
+
+**SpaceNet 2, AOI_2_Vegas** is a public building-footprint benchmark built on WorldView-3 imagery of Las Vegas. One WorldView-3 acquisition records a panchromatic (PAN) band and 8 multispectral (MS) bands at the same time. The MS pixels are 4× coarser than the PAN pixels; that is a property of the sensor, not a downsampling step. SpaceNet ships the raw bands and pan-sharpened products, which fuse PAN detail with MS colour.
+
+| SpaceNet 2 folder | Content | Pixel | Used here |
+| --- | --- | --- | --- |
+| PAN | 1 panchromatic band | about 0.3 m | no |
+| MS | 8 bands: Coastal, Blue, Green, Yellow, Red, Red Edge, NIR1, NIR2 | about 1.2 m (163 × 163 px per chip) | **LR input**, bands 5, 3, 2 (Red, Green, Blue) |
+| PS-MS | 8 pan-sharpened bands | about 0.3 m | no |
+| PS-RGB | pan-sharpened Red, Green, Blue | about 0.3 m (650 × 650 px per chip) | **HR reference** |
+| geojson_buildings | building footprint polygons | – | labels |
+
+- **Area.** Each chip covers about 157.8 m × 194.7 m. The 3,850 labelled train chips are scattered between unlabelled test chips, so the densest window of about 8.36 km × 6.81 km was chosen and only its 1,168 train chips were downloaded from `s3://spacenet-dataset/spacenet/SN2_buildings/train/AOI_2_Vegas/`. Details in [docs/data_report.md](docs/data_report.md)
+- **LR input.** MS bands 5, 3, 2 (Red, Green, Blue of the WorldView-3 8-band order), warped to a 1.2 m UTM grid (EPSG:32611). The band choice was checked by correlating each MS band with PS-RGB averaged to the MS grid
+- **HR reference.** PS-RGB warped to a 0.3 m grid. **PS-RGB is a pan-sharpened product** made from the PAN and MS bands of the same acquisition: the best available 0.3 m colour image, but not an independent measurement
+- **8-bit conversion.** Both products are 11-bit. Each gets its own 2–98 percentile stretch per band, computed on train blocks only
+- **Spatial split.** 35,265 buildings assigned by 576 m blocks (LR 480 px) to train / val / test by building count: 118 / 26 / 24 blocks with 23,394 / 5,020 / 5,194 buildings. Tiles are 307.2 m (HR 1024 px, LR 256 px), 2×2 per block, and never cross a block boundary
+- **NoData and evaluation zone.** Train and test chips are interleaved, so the downloaded window has holes. The valid mask is the union of chip footprints, not pixel values, and invalid pixels are filled with the train-block mean colour. Every SR output is overwritten with the same fill. The evaluation zone is the footprint shrunk inward by 9.6 m (8 LR px); GT and predictions with at least 50% of their area outside it are dropped from TP, FP and FN
+
+**Common UTM grid**
+
+- SpaceNet chips use geographic coordinates (EPSG:4326, degrees), so at the latitude of Las Vegas the pixels are not square on the ground. PS-RGB pixels are 0.2427 m × 0.2995 m and MS pixels 0.9677 m × 1.1944 m (east-west × north-south)
+- UTM (Universal Transverse Mercator) is a map projection in metres. Las Vegas lies in zone 11N (EPSG:32611)
+- Both products were warped with GDAL to aligned UTM 11N grids: HR at 0.3 m and LR at 1.2 m from the same origin, so one LR pixel covers exactly 4 × 4 HR pixels (checked by assertion). HR, LR, every SR output and the labels share pixel positions and map coordinates
+- Before warping, the MS chip metadata was corrected for the 650 / 4 = 162.5 px chip phase, and alignment was checked per block with ECC (see "Problems solved along the way")
+
+</details>
+
+<details>
+<summary><b>How the fine-tuned SR model (S6) was trained, and how it compares with the model before fine-tuning</b></summary>
+
+S6 is Real-ESRGAN fine-tuned on real image pairs. It starts from the same public weights as S4, so S6 − S4 isolates the effect of fine-tuning. Source: [results/s6_finetune.json](results/s6_finetune.json), [results/S6_realesrgan_ft_spacenet.yml](results/S6_realesrgan_ft_spacenet.yml), [docs/decisions.md](docs/decisions.md).
+
+| Item | Setting |
+| --- | --- |
+| Starting weights | official RealESRGAN_x4plus (generator) and RealESRGAN_x4plus_netD (U-Net discriminator) |
+| Recipe | official Real-ESRGAN paired-data fine-tuning config, with weight paths, data paths, iterations and milestones set for this run |
+| Training data | 433 train-block tile pairs: real multispectral 1.2 m (LR) with pan-sharpened 0.3 m (HR) of the same place |
+| Losses | L1 pixel loss, perceptual loss, GAN loss |
+| Optimiser | Adam, learning rate 1e-4, batch 12, random 256 px HR crops |
+| Iterations | 23,600 of the official 400,000 (5.9%), from a measured 0.4117 s per iteration within 3 h × 0.9 |
+| Time | 9,481 s on one RTX 4090 |
+| Checkpoint | the last one; the largest weight change from the start was 0.237, so training did change the model |
+| Leakage control | trained on train blocks only and evaluated on spatially separate test blocks |
+
+| Metric (test blocks) | S4, public weights | S6, fine-tuned |
+| --- | --- | --- |
+| PSNR | 19.09 | 21.05 |
+| SSIM | 0.549 | 0.637 |
+| LPIPS (lower is better) | 0.312 | 0.149 |
+| AP50_geo [95% CI] | 0.704 [0.679, 0.728] | 0.808 [0.791, 0.825] |
+| Recall, buildings under 50 m² | 0.088 | 0.283 |
+| False-positive ratio | 0.172 | 0.147 |
+
+The two AP50_geo intervals do not overlap. The comparison holds for a detector trained on HR and kept fixed.
+
+</details>
+
+<details>
+<summary><b>Method details (detection paths, matching, verdict, frozen settings)</b></summary>
+
+- **Path 1 (lower bound):** D_LR, a YOLO26s-OBB trained on LR tiles (imgsz 256), detects on LR
+- **Path 2:** D_HR, the same architecture trained on HR tiles (imgsz 1024), detects on each SR output. D_HR is never retrained for an SR method, so every conclusion carries the condition "with a detector trained on HR and kept fixed"
+- **Upper bound:** D_HR on HR
+- **SR methods (×4, same 8-bit LR tiles as input):**
+
+  | ID | Category | Method |
+  |---|---|---|
+  | S0 / S1 | Interpolation | GDAL cubic / lanczos |
+  | S2 | Regression | SwinIR classical ×4 (DF2K) |
+  | S3 | Regression | Real-ESRNet x4plus |
+  | S4 | GAN | Real-ESRGAN x4plus |
+  | S5 | Diffusion (efficient) | ResShift v3 |
+  | S6 | Domain fine-tuning | Real-ESRGAN fine-tuned on train-block MS–PS pairs |
+  | S7 | One-step diffusion | OSEDiff |
+
+  S6 used the official paired-data fine-tuning config, starting from RealESRGAN_x4plus. Its 23,600 iterations follow from a measured 0.4117 s/iter and a 3 h budget
+- **Merging and matching:** tile predictions are merged with `cv2.dnn.NMSBoxesRotated` per block at IoU 0.5, then matched to GT (minimum rotated rectangle of each footprint) in UTM at rotated IoU ≥ 0.5
+- **Metrics:** AP50_geo uses predictions with conf ≥ 0.001 and max_det 3000. Recall by area and false positives use an operating confidence chosen on val by maximum F1: 0.503 for D_HR (also applied to every SR row) and 0.562 for D_LR
+- **Verdict:** 95% CIs come from a test-block bootstrap (1,000 resamples, seed 0). gain = AP50_geo(path 2) − AP50_geo(path 1), computed on the same resample. **useful** if the gain CI lower bound is above 0, **harmful** if the upper bound is below 0, **inconclusive** otherwise. recovery = gain / (AP50_geo(HR) − AP50_geo(LR))
+- **Settings frozen before test:** detector weights (SHA256), max_det, merge IoU, operating confidences, buffer, Canny thresholds and the code commit were recorded in [docs/frozen_eval.md](docs/frozen_eval.md) before the test blocks were evaluated. Everything was chosen on train or val blocks. The later post-hoc rerun is logged in the same file
+- **200-epoch decision (rule fixed in advance):** the first D_LR ran to the 100-epoch default without early stopping. Before training a separate 200-epoch D_LR, the rule was set: retrain both detectors at 200 epochs if LR val AP50_geo rises by ≥ 0.01. It rose from 0.6619 to 0.6743 (+0.0124), so both detectors were retrained with epochs 200 and patience 20. D_HR early-stopped at 86 epochs; D_LR ran all 200. Best weights were chosen on val by the Ultralytics default fitness, mAP50-95 ([docs/decisions.md](docs/decisions.md))
+
+</details>
+
+<details>
+<summary><b>Problems solved along the way (data holes, registration check, baseline)</b></summary>
+
+- **The data had holes.** In AOI_2_Vegas the train chips occupy 54% of the chip grid (3,850 of 7,120 cells), scattered between test chips that have no public labels. The largest hole-free square is 4×4 chips, so a contiguous 1,200-chip area does not exist. The densest rectangle (35 × 53 chips, 1,168 train chips, density 0.63) was used, with the holes handled by the footprint mask. A 9.6 m border was excluded from evaluation, and the method ranking was the same at 0, 8 and 16 LR px insets ([docs/data_report.md](docs/data_report.md), [docs/decisions.md](docs/decisions.md))
+- **The registration check was wrong before the data was.** 110 of 168 blocks first failed the 0.5 LR px threshold. `phaseCorrelate` in OpenCV pads its input to `getOptimalDFTSize`, and on any axis where that size is odd the estimate is biased by exactly +0.5 px. With identical images, widths 128, 144, 150 and 160 gave 0.000 and widths 129, 130 and 135 gave 0.500. In a synthetic test on 41 chips (HR averaged to 1.2 m, shifted by 0, 0.25 and 0.5 px), phaseCorrelate returned +0.500 at zero shift on the east–west axis, while ECC had a maximum error of 0.017 px. The fix crops each window to an even optimal DFT size and records ECC as a cross-check ([scripts/diag/g5_investigate.py](scripts/diag/g5_investigate.py))
+- **MS chip origin phase from 162.5.** Each 650 px PS-RGB chip has a 163 px MS chip with the same corner coordinates, but 650 / 4 = 162.5. The metadata stretches the MS pixel to fit the chip. Chip-centre east–west offsets split by global chip column parity (even columns -0.125, odd columns +0.390 MS px, a difference of 0.515 MS px). It was corrected by a geometric rule with no per-chip measurement: the east–west pixel is set to 4× PS, and the origin of odd-column chips is moved by −2 PS px. After it the residual IQR width was 0.106 MS px, and the number of blocks over 0.5 LR px fell from 9 to 6 of 168 (all train, all caused by the north–south offset) ([scripts/diag/g5_phase.py](scripts/diag/g5_phase.py), [scripts/diag/g5_rule_sim.py](scripts/diag/g5_rule_sim.py), [results/figures/g5_before_after/](results/figures/g5_before_after/))
+- **North–south residual left uncorrected.** LR content sits north of HR by a block ECC median of -0.265 LR px (IQR -0.345 to -0.199), about 0.3 m, with the same sign across the area. A north–south pixel-size hypothesis raised the blocks over 0.5 LR px from 6 to 69 of 168, so it was not applied. The cause is unknown. The largest test-block offset is 0.496 LR px, just under the 0.5 threshold ([results/figures/g5_offset_map.png](results/figures/g5_offset_map.png))
+- **A weak baseline would inflate every gain.** Whether the LR detector was under-trained was tested against a threshold written down in advance; it was met, so both detectors were retrained at 200 epochs (see "Method details")
+
+</details>
+
+<details>
+<summary><b>Post-hoc analysis (not a primary result)</b></summary>
 
 These analyses were requested after the test results had been seen. They reuse the frozen detectors and evaluation settings and are stored separately in [results/posthoc/](results/posthoc/). [results/summary.csv](results/summary.csv) and the verdicts above are unchanged. CIs use the same block-bootstrap resamples (verified to reproduce the main AP50 and CI).
 
@@ -272,7 +271,7 @@ These analyses were requested after the test results had been seen. They reuse t
 | S3_color | 0.713 [0.690, 0.738] | +0.044 [+0.029, +0.061] | better |
 <!-- END:ph_s0 -->
 
-**Colour-correction control.** A per-band linear map (gain, offset) from LR 8-bit values to HR 8-bit values (4×4 mean) was fitted by least squares on train-block pixels inside the evaluation mask. It was applied to S0 and S3 to create S0_color and S3_color.
+**Colour-correction control.** A per-band linear map (gain, offset) from LR 8-bit values to HR 8-bit values (4×4 mean) was fitted by least squares on train-block pixels inside the evaluation mask and applied to S0 and S3 to create S0_color and S3_color.
 
 <!-- BEGIN:ph_colorfit -->
 | band | gain | offset | R² |
@@ -293,7 +292,7 @@ These analyses were requested after the test results had been seen. They reuse t
 | S3_color | 0.713 [0.690, 0.738] | S3_realesrnet_x4plus | 0.716 | -0.003 [-0.009, +0.004] | inconclusive |
 <!-- END:ph_color -->
 
-The global linear colour shift did not help: S0_color is worse than S0, and S3_color is inconclusive against S3. Both stay well below S6, by -0.151 and -0.095 with CIs that exclude 0. The S6 gain is therefore not explained by a global linear color shift. This control does not show what the S6 gain does come from, and non-linear or local colour differences were not tested.
+The global linear colour shift did not help: S0_color is worse than S0, and S3_color is inconclusive against S3. Both stay below S6, by -0.151 and -0.095 with CIs that exclude 0. The S6 gain is therefore not explained by a global linear color shift. This control does not show where the S6 gain comes from, and non-linear or local colour differences were not tested.
 
 **Recall by area, false positives and prediction counts at the operating confidence.**
 
@@ -314,9 +313,9 @@ The global linear colour shift did not help: S0_color is worse than S0, and S3_c
 | S3_color | 0.503 | 0.077 [0.055, 0.100] | 0.516 [0.435, 0.594] | 0.836 [0.801, 0.871] | 0.758 [0.610, 0.852] | 407 | 3113 | 0.131 |
 <!-- END:ph_area -->
 
-- S6 recall for buildings under 50 m² is 0.283. Every other SR method is at or below 0.088, and HR is at 0.427.
-- S7 (OSEDiff) has the most false positives (763) and the highest FP ratio (0.204). S4 follows with an FP ratio of 0.172. HR has 0.139.
-- **Fewer predictions from public SR at a fixed confidence.** At the D_HR operating confidence (0.503), D_HR gives 4,202 predictions on HR and 4,046 on S6. On S0, S1 and S2 it gives only 2,535, 2,303 and 2,606. The low FP counts of the interpolators (290, 268) come with this drop in prediction count, not with a cleaner output: their FP ratios (0.114, 0.116) are close to HR, while their recall drops in every bin above 50 m². The detector's confidence shifts on these inputs, so a confidence threshold calibrated on HR passes fewer boxes. Re-calibrating the confidence per SR method was not done, because it would require val SR outputs and would change the frozen settings.
+- S6 recall for buildings under 50 m² is 0.283. Every other SR method is at or below 0.088, and HR is at 0.427
+- S7 (OSEDiff) has the most false positives (763) and the highest FP ratio (0.204). S4 follows with an FP ratio of 0.172; HR has 0.139
+- **Fewer predictions from public SR at a fixed confidence.** At the D_HR operating confidence (0.503), D_HR gives 4,202 predictions on HR and 4,046 on S6, but only 2,535, 2,303 and 2,606 on S0, S1 and S2. The low FP counts of the interpolators (290, 268) come from this drop in prediction count, not from a cleaner output: their FP ratios (0.114, 0.116) are close to HR, while their recall drops in every bin above 50 m². Re-calibrating the confidence per SR method was not done, because it would require val SR outputs and would change the frozen settings
 
 **Spearman without S6.** S6 is best on both PSNR and AP50_geo, so it alone can drive the correlation.
 
@@ -335,46 +334,47 @@ The global linear colour shift did not help: S0_color is worse than S0, and S3_c
 
 Without S6, PSNR and SSIM have almost no rank correlation with AP50_geo (ρ 0.071 and 0.000). LPIPS keeps a weak trend (n=7, p=0.094). With 7 or 8 methods these correlations are imprecise.
 
-**Qualitative examples.** Two test windows of 153.6 m with a median building count. GT is yellow, TP green, FP red; matching is the geographic matching at the operating confidence.
+An offline viewer of all 96 test tiles (per-tile detections, |SR−HR|, Canny edges, before/after slider) is generated by `run.py report_viewer` into `results/report/` (not committed because of its size). The tile-level F1 values in the viewer are for reference only; the official metrics are in [results/summary.csv](results/summary.csv).
 
-![qualitative b028_r1c0](results/figures/qualitative_b028_r1c0.png)
+</details>
 
-![qualitative b132_r0c0](results/figures/qualitative_b132_r0c0.png)
+<details>
+<summary><b>Relation to prior work</b></summary>
 
-An offline viewer of all 96 test tiles (per-tile detections, |SR−HR|, Canny edges, before/after slider) is generated by `run.py report_viewer` into `results/report/` (not committed because of its size). The tile-level F1 values in the viewer are for reference only; the official metrics are those in [results/summary.csv](results/summary.csv).
+SR papers usually rank models by PSNR, SSIM or LPIPS. What matters to a downstream user is whether running SR before an existing analysis model gives better maps than analysing the original data directly. This experiment answers that for one task, rotated building detection.
 
-## Engineering findings
+- **Shermeyer & Van Etten 2019** ([arXiv:1812.04098](https://arxiv.org/abs/1812.04098), EarthVision): super-resolved satellite imagery with VDSR and a random-forest method at ×2, ×4 and ×8 and measured object detection. The largest benefit came from going 30 cm to 15 cm, with smaller benefits at coarser resolutions. Their detectors were trained on each resolution and on SR output, so this experiment differs in three ways: the LR input is a real sensor product rather than a resampled image, the detector is trained once on HR and kept fixed, and the objects are buildings
+- **GeoSR-Bench** ([arXiv:2605.00310](https://arxiv.org/abs/2605.00310)): benchmarks 9 SR models on co-located multi-platform image pairs, evaluating downstream tasks (land-cover segmentation, infrastructure mapping, biophysical variable estimation) alongside perceptual quality, and reports that gains on fidelity metrics often do not carry over to downstream tasks. This repository is a smaller, single-scene case study with the same motivation (one city, one sensor pair, one task, block-level bootstrap CIs, settings frozen before the test evaluation)
 
-- **SpaceNet train and test chips are spatially interleaved.** In AOI_2_Vegas the train chips occupy 54% of the chip grid (3,850 of 7,120 cells), scattered between test chips that have no public labels. The largest hole-free square is 4×4 chips, so a contiguous 1,200-chip area does not exist. The densest rectangle (35 × 53 chips, 1,168 train chips, density 0.63) was used, with the holes handled by the footprint mask. Evidence: [docs/data_report.md](docs/data_report.md), [docs/decisions.md](docs/decisions.md).
-- **OpenCV `phaseCorrelate` has an exact +0.5 px bias on odd padded sizes.** `phaseCorrelate` pads its input to `getOptimalDFTSize`. On any axis where that size is odd, the estimate is biased by exactly +0.5 px. With identical images, widths 128, 144, 150 and 160 gave 0.000 and widths 129, 130 and 135 gave 0.500. In a synthetic test on 41 chips (HR averaged to 1.2 m, shifted by 0, 0.25 and 0.5 px), phaseCorrelate returned +0.500 at zero shift on the east–west axis, while ECC had a maximum error of 0.017 px. The first registration check failure (110/168 blocks over 0.5 LR px) was this bias. The fix crops each window to an even optimal DFT size and records ECC as a cross-check. Evidence: [docs/data_report.md](docs/data_report.md), [scripts/diag/g5_investigate.py](scripts/diag/g5_investigate.py).
-- **MS chip origin phase from 162.5.** Each 650 px PS-RGB chip has a 163 px MS chip with the same corner coordinates, but 650 / 4 = 162.5. The metadata stretches the MS pixel to fit the chip. Chip-centre east–west offsets split by global chip column parity: even columns -0.125 and odd columns +0.390 MS px, a difference of 0.515 MS px. The correction is geometric and uses no per-chip measurement: the east–west pixel is set to 4× PS, and the origin of odd-column chips is moved by −2 PS px. After it the residual IQR width was 0.106 MS px, and the number of blocks over 0.5 LR px fell from 9 to 6 of 168 (all train, all caused by the north–south offset). Evidence: [docs/decisions.md](docs/decisions.md), [scripts/diag/g5_phase.py](scripts/diag/g5_phase.py), [scripts/diag/g5_rule_sim.py](scripts/diag/g5_rule_sim.py), [results/figures/g5_before_after/](results/figures/g5_before_after/).
-- **North–south residual left uncorrected.** LR content sits north of HR by a block ECC median of -0.265 LR px (IQR -0.345 to -0.199), about 0.3 m, with the same sign across the area. A north–south pixel-size hypothesis made it worse, raising the blocks over 0.5 LR px from 6 to 69 of 168, so it was not applied. The cause is unknown. The largest test-block offset is 0.496 LR px, just under the 0.5 threshold. Evidence: [docs/data_report.md](docs/data_report.md), [results/figures/g5_offset_map.png](results/figures/g5_offset_map.png).
+</details>
 
-![registration before and after the MS fix](results/figures/g5_offset_before_after_msfix.png)
+<details>
+<summary><b>Limitations</b></summary>
 
-## Limitations
+- **Single city and single acquisition.** One city (Las Vegas), one WorldView-3 acquisition, only part of the AOI (1,168 chips), one class (building), one scale (×4)
+- **HR is a pan-sharpened product.** The reference is derived from the same acquisition's PAN and MS bands, so it is not an independent 0.3 m measurement. HR and LR also differ in colour as products, each with its own percentile stretch
+- **Fixed detector.** Every result of path 2 holds only for a detector trained on HR and kept fixed. With one detector (YOLO26s-OBB) trained on pan-sharpened texture, the experiment cannot separate "SR restores information" from "SR output resembles the pan-sharpened texture the detector was trained on". Training a detector on each SR output was not done
+- **Colour control.** Only a global per-band linear colour correction was tested (post-hoc)
+- **Few methods.** With 8 SR methods (7 without S6), the Spearman correlations have low reliability
+- **S6 generalisation.** Fine-tuned on MS–PS pairs from train blocks of the same city and acquisition. Generalisation to other areas or sensors was not tested
+- **SD2.1-base mirror.** S7 depends on SD2.1-base, downloaded from the personal mirror linked in the OSEDiff README (Manojb/stable-diffusion-2-1-base, commit in [third_party/VERSIONS.md](third_party/VERSIONS.md)). It was not verified to be identical to the stabilityai original, which was not accessible
+- **Training degradation mismatch.** The public SR models were trained on synthetic or other-domain degradations, not on real MS characteristics. For example, the MS bands contain values at the 11-bit ceiling
+- **Registration.** The uncorrected north–south offset of about 0.3 m remains in the comparison between path 1 and path 2
+- **Box shape.** GT and predictions are compared as rotated rectangles. For L- or U-shaped buildings the rectangle is larger than the roof, so IoU matching can differ from the true outline. Area bins use the polygon area
+- **Calibration.** The operating confidence is calibrated on HR val and applied unchanged to SR outputs (see the prediction-count finding in the post-hoc analysis)
+- **Excluded methods.** AdcSR (S8) was disabled in the config (`enable_adcsr: false`). Anime-domain models such as RealESRGAN_x4plus_anime_6B were excluded because their training domain differs
 
-- **Single city and single acquisition.** One city (Las Vegas), one WorldView-3 acquisition, only part of the AOI (1,168 chips), one class (building), one scale (×4).
-- **HR is a pan-sharpened product.** The reference is derived from the same acquisition's PAN and MS bands, so it is not an independent 0.3 m measurement. HR and LR also differ in colour as products; each has its own percentile stretch.
-- **Fixed detector.** Every result of path 2 holds only for a detector trained on HR and kept fixed. With one detector (YOLO26s-OBB) trained on pan-sharpened texture, the experiment cannot separate "SR restores information" from "SR output resembles the pan-sharpened texture the detector was trained on". Training a detector on each SR output was not done.
-- **Colour control.** Only a global per-band linear colour correction was tested (post-hoc).
-- **Few methods.** With 8 SR methods (7 without S6), the Spearman correlations have low reliability.
-- **S6 generalisation.** S6 was fine-tuned on MS–PS pairs from train blocks of the same city and acquisition. Generalisation to other areas or sensors was not tested.
-- **SD2.1-base mirror.** S7 depends on SD2.1-base, which was downloaded from the personal mirror linked in the OSEDiff README (Manojb/stable-diffusion-2-1-base, commit in [third_party/VERSIONS.md](third_party/VERSIONS.md)). It was not verified to be identical to the stabilityai original, which was not accessible.
-- **Training degradation mismatch.** The public SR models were trained on synthetic or other-domain degradations, not on real MS characteristics. For example, the MS bands contain values at the 11-bit ceiling.
-- **Registration.** The uncorrected north–south offset of about 0.3 m remains in the comparison between path 1 and path 2 (see Engineering findings).
-- **Box shape.** GT and predictions are compared as rotated rectangles. For L- or U-shaped buildings the rectangle is larger than the roof, so IoU matching can differ from the true outline. Area bins use the polygon area.
-- **Calibration.** The operating confidence is calibrated on HR val and applied unchanged to SR outputs (see the prediction-count finding above).
-- **Excluded methods.** AdcSR (S8) was disabled in the config (`enable_adcsr: false`). Anime-domain models such as RealESRGAN_x4plus_anime_6B were excluded because their training domain differs.
+</details>
 
-## Reproduce
+<details>
+<summary><b>Reproduce</b></summary>
 
-- **Hardware used:** 1× RTX 4090 (24,564 MiB), a cgroup limit of 13.6 CPU cores and 62 GB RAM, and a RunPod network volume at `/workspace`.
-- **Environments:** 3 conda environments (Miniforge at `/workspace/miniforge3`). They are split because of the pinned official versions ([docs/env_matrix.md](docs/env_matrix.md), [docs/env_report.md](docs/env_report.md)):
-  - `geo`: Python 3.12, GDAL / rasterio / geopandas / OpenCV / Ultralytics / evaluation, and `run.py`.
-  - `sr`: Python 3.10, PyTorch 2.1.2, BasicSR, Real-ESRGAN, SwinIR, ResShift.
-  - `osediff`: Python 3.10, PyTorch 2.0.1, OSEDiff.
-- **Files:** environment files and lock files are in [env/](env/). External repositories and their commits are listed in [third_party/VERSIONS.md](third_party/VERSIONS.md).
+- **Hardware:** 1× RTX 4090 (24,564 MiB), a cgroup limit of 13.6 CPU cores and 62 GB RAM, and a RunPod network volume at `/workspace`
+- **Environments:** 3 conda environments (Miniforge at `/workspace/miniforge3`), split because of the pinned official versions ([docs/env_matrix.md](docs/env_matrix.md), [docs/env_report.md](docs/env_report.md))
+  - `geo`: Python 3.12, GDAL / rasterio / geopandas / OpenCV / Ultralytics / evaluation, and `run.py`
+  - `sr`: Python 3.10, PyTorch 2.1.2, BasicSR, Real-ESRGAN, SwinIR, ResShift
+  - `osediff`: Python 3.10, PyTorch 2.0.1, OSEDiff
+- **Files:** environment and lock files in [env/](env/); external repositories and their commits in [third_party/VERSIONS.md](third_party/VERSIONS.md)
 
 ```bash
 bash scripts/setup_envs.sh                       # environments, third_party clones, weights (idempotent)
@@ -404,10 +404,12 @@ Wall time per stage (last full run, from `logs/timing.csv`; environment setup an
 
 Cost is the total above multiplied by the hourly price of a single-RTX 4090 pod; the price was not recorded in this repository. S6 fine-tuning is the largest single item.
 
+</details>
+
 ## License and attribution
 
-- **Data:** SpaceNet 2 building dataset (AOI_2_Vegas), SpaceNet on Amazon Web Services (AWS), licensed under CC BY-SA 4.0 (https://registry.opendata.aws/spacenet/). Derived rasters and labels in this repository fall under the same license.
-- **Code of this repository:** no license file has been added yet.
+- **Data:** SpaceNet 2 building dataset (AOI_2_Vegas), SpaceNet on Amazon Web Services (AWS), licensed under CC BY-SA 4.0 (https://registry.opendata.aws/spacenet/). Derived rasters and labels in this repository fall under the same license
+- **Code of this repository:** no license file has been added yet
 - **Models and code used:**
 
   | Component | License | Note |
